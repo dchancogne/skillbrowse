@@ -4,7 +4,7 @@
 **Status:** Approved design  
 **Target release:** 1.0  
 **Platforms:** macOS and Linux  
-**Companion:** [Project brief](../../../skillbrowse-project-brief.md)
+**Companion:** [Project brief](../../skillbrowse-project-brief.md)
 
 ## 1. Product definition
 
@@ -478,4 +478,3 @@ Version 1.0 is ready when:
 - [GoReleaser introduction](https://goreleaser.com/getting-started/intro/)
 - [GoReleaser checksums](https://goreleaser.com/customization/package/checksum/)
 - [GoReleaser signing](https://goreleaser.com/customization/sign/sign/)
-
