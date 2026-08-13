@@ -51,9 +51,14 @@ Confirmed decisions: module path `github.com/dchancogne/skillbrowse`, Cobra for 
 - `cmd/skillbrowse` had zero test coverage before this phase; added root_test.go (exit-code classification, version output, malformed-config/unknown-command/unknown-flag exit codes).
 
 ## Phase 5 — Performance validation
-- [ ] Synthetic fixture generator (1,000 / 10,000 skills)
-- [ ] Benchmarks vs NFR-01–04 targets
-- [ ] Goroutine-leak check on cancellation (NFR-07)
+- [x] Synthetic fixture generator (1,000 / 10,000 skills) — `internal/benchfixture`
+- [x] Benchmarks vs NFR-01–04 targets:
+  - NFR-01 (100ms/p95 first frame): `BenchmarkModel_View_BeforeScan` — ~0.66ms/op
+  - NFR-02 (500ms/p95, 1,000 skills): `BenchmarkPipeline_1000Skills` — ~73ms/op; `TestPipeline_1000SkillsRegressionGuard` is a loose (5s) CI smoke-test guard, not a strict p95 gate — shared CI hardware is noisier than "a 2022-era laptop with an SSD," so the benchmark itself is the real instrument for tracking this number
+  - NFR-03 (50ms/p95 navigation/filter): `BenchmarkModel_Navigation` (~1.6ms/op), `BenchmarkModel_Filter` (~1.4ms/op)
+  - NFR-04 (<100 MiB for 10,000 skills / <=50MiB Markdown): `TestCatalog_MemoryBudget` — measures retained heap (post-GC), not cumulative allocation; ~54 MiB retained for ~47 MiB of content
+  - All comfortably within target on this dev machine (Intel i7-9750H); numbers will vary on other hardware, hence benchmarks over hardcoded thresholds
+- [x] Goroutine-leak check on cancellation (NFR-07) — `internal/discovery/leak_test.go` via `go.uber.org/goleak`, covering both the cancelled-mid-scan and normal-completion paths (goroutines only actually originate in discovery's worker pool; the UI's cancellation wiring that calls into it was already exercised by Phase 2's rescan/quit tests)
 
 ## Phase 6 — Release pipeline
 - [ ] GoReleaser config (macOS/Linux × amd64/arm64, checksums, signing, provenance/SBOM)
