@@ -8,6 +8,7 @@ on:
 permissions:
   contents: write # create the GitHub Release and upload assets
   id-token: write # OIDC token for build provenance attestation
+  attestations: write # persist the build provenance attestation
 
 jobs:
   release:
