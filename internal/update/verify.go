@@ -2,6 +2,7 @@ package update
 
 import (
 	"crypto/ed25519"
+	"encoding/hex"
 	"fmt"
 )
 
@@ -28,12 +29,32 @@ func (v Verifier) VerifyManifestSignature(manifest, sig []byte) error {
 	return fmt.Errorf("checksums.txt signature does not verify against any trusted key")
 }
 
-// defaultTrustedKeys are the Ed25519 public keys embedded in official
-// binaries. This is a development placeholder: Phase 6's signed release
-// workflow must generate the real signing key pair, commit only the
-// public key here, and keep the private key in the release environment's
-// secret storage — never in this repository.
-var defaultTrustedKeys []ed25519.PublicKey
+// signingKeyHex is the hex-encoded Ed25519 public key official binaries
+// trust to verify checksums.txt, per design doc §12.3. The matching
+// private key lives only in the release workflow's secret storage
+// (GitHub Actions secret SKILLBROWSE_SIGNING_KEY) — never in this
+// repository. On key rotation, add the new key's hex here alongside
+// this one (don't replace it) so releases signed with either key still
+// verify, then retire this one in a later release per §12.3's rotation
+// procedure.
+const signingKeyHex = "b9991b8853a2b28d346199513d55850261eaa9667a66d1b53b154ac80eed5f3f"
+
+var defaultTrustedKeys = mustDecodeKeys(signingKeyHex)
+
+func mustDecodeKeys(hexKeys ...string) []ed25519.PublicKey {
+	keys := make([]ed25519.PublicKey, len(hexKeys))
+	for i, h := range hexKeys {
+		raw, err := hex.DecodeString(h)
+		if err != nil {
+			panic(fmt.Sprintf("update: invalid embedded signing key: %s", err))
+		}
+		if len(raw) != ed25519.PublicKeySize {
+			panic(fmt.Sprintf("update: embedded signing key has wrong length: got %d, want %d", len(raw), ed25519.PublicKeySize))
+		}
+		keys[i] = ed25519.PublicKey(raw)
+	}
+	return keys
+}
 
 // DefaultVerifier returns a Verifier using the embedded trusted keys.
 func DefaultVerifier() Verifier {

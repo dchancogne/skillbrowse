@@ -1,0 +1,85 @@
+version: 2
+
+project_name: skillbrowse
+
+before:
+  hooks:
+    - go mod tidy
+
+builds:
+  - id: skillbrowse
+    main: ./cmd/skillbrowse
+    binary: skillbrowse
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - darwin
+      - linux
+    goarch:
+      - amd64
+      - arm64
+    ldflags:
+      - -s -w
+      - -X github.com/dchancogne/skillbrowse/internal/buildinfo.Version={{ .Version }}
+      - -X github.com/dchancogne/skillbrowse/internal/buildinfo.Commit={{ .Commit }}
+      - -X github.com/dchancogne/skillbrowse/internal/buildinfo.Date={{ .Date }}
+
+# Archive names must match internal/update/client.go's AssetName exactly
+# (skillbrowse_<os>_<arch>.tar.gz) — the self-updater looks up this
+# literal name in the release's asset list.
+archives:
+  - id: default
+    formats: [tar.gz]
+    name_template: "skillbrowse_{{ .Os }}_{{ .Arch }}"
+    files:
+      - LICENSE*
+      - README.md
+
+checksum:
+  name_template: checksums.txt
+  algorithm: sha256
+
+# SBOM per release archive, per design doc §12.4 ("Build provenance and
+# an SBOM produced by the release workflow"). Requires `syft` on PATH in
+# the release runner (installed as a workflow step, not committed here).
+sboms:
+  - id: default
+    artifacts: archive
+
+# Signs checksums.txt with the Ed25519 key skillbrowse binaries trust
+# (internal/update/verify.go), per design doc §12.3. tools/checksum-signer
+# reads the private key from SKILLBROWSE_SIGNING_KEY (a release-workflow
+# secret, never committed) and never accepts it as a CLI argument.
+signs:
+  - id: checksums-ed25519
+    cmd: go
+    args: ["run", "./tools/checksum-signer", "sign", "${artifact}"]
+    artifacts: checksum
+    signature: "${artifact}.sig"
+
+release:
+  github:
+    owner: dchancogne
+    name: skillbrowse
+  draft: false
+  prerelease: auto
+  mode: replace
+  # Design doc §15: "Release notes explicitly identify source-registry
+  # additions and changes to discovery behavior." That's a manual,
+  # content-dependent editorial step — add it to this release's notes
+  # body by hand (via `gh release edit`) when a release includes such a
+  # change; the auto-generated changelog below only lists commits.
+  footer: |
+    ## Verifying this release
+
+    See the "Verifying releases" section of README.md for the full
+    checksum/signature verification steps.
+
+changelog:
+  use: github
+  sort: asc
+  filters:
+    exclude:
+      - "^docs:"
+      - "^test:"
+      - "^ci:"

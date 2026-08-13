@@ -1,0 +1,100 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*.*.*"
+
+permissions:
+  contents: write # create the GitHub Release and upload assets
+  id-token: write # OIDC token for build provenance attestation
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # goreleaser needs full history for the changelog
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - name: install syft (SBOM generation)
+        uses: anchore/sbom-action/download-syft@v0
+
+      - name: run test suite
+        run: go test -race ./...
+
+      - name: run goreleaser
+        uses: goreleaser/goreleaser-action@v6
+        with:
+          distribution: goreleaser
+          version: latest
+          args: release --clean
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SKILLBROWSE_SIGNING_KEY: ${{ secrets.SKILLBROWSE_SIGNING_KEY }}
+
+      - name: attest build provenance
+        uses: actions/attest-build-provenance@v1
+        with:
+          subject-path: "dist/skillbrowse_*.tar.gz"
+
+  smoke-test:
+    name: smoke test (${{ matrix.goos }}/${{ matrix.goarch }})
+    needs: release
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            goos: linux
+            goarch: amd64
+          - os: macos-13 # Intel runner
+            goos: darwin
+            goarch: amd64
+          - os: macos-14 # Apple Silicon runner
+            goos: darwin
+            goarch: arm64
+    runs-on: ${{ matrix.os }}
+    steps:
+      - name: download and launch the published release
+        env:
+          TAG: ${{ github.ref_name }}
+          GOOS: ${{ matrix.goos }}
+          GOARCH: ${{ matrix.goarch }}
+        run: |
+          set -euo pipefail
+          asset="skillbrowse_${GOOS}_${GOARCH}.tar.gz"
+          url="https://github.com/${{ github.repository }}/releases/download/${TAG}/${asset}"
+          curl -sSfL -o "$asset" "$url"
+          curl -sSfL -o checksums.txt "https://github.com/${{ github.repository }}/releases/download/${TAG}/checksums.txt"
+          grep " ${asset}\$" checksums.txt | shasum -a 256 -c -
+          tar -xzf "$asset"
+          ./skillbrowse version
+          ./skillbrowse help
+
+  smoke-test-linux-arm64:
+    name: smoke test (linux/arm64, via QEMU)
+    needs: release
+    runs-on: ubuntu-latest
+    steps:
+      - uses: docker/setup-qemu-action@v3
+        with:
+          platforms: arm64
+      - name: download and launch the published release under emulation
+        env:
+          TAG: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+          asset="skillbrowse_linux_arm64.tar.gz"
+          url="https://github.com/${{ github.repository }}/releases/download/${TAG}/${asset}"
+          curl -sSfL -o "$asset" "$url"
+          curl -sSfL -o checksums.txt "https://github.com/${{ github.repository }}/releases/download/${TAG}/checksums.txt"
+          grep " ${asset}\$" checksums.txt | shasum -a 256 -c -
+          tar -xzf "$asset"
+          docker run --rm --platform linux/arm64 \
+            -v "$PWD:/work" -w /work arm64v8/debian:bookworm-slim \
+            ./skillbrowse version

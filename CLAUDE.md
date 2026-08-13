@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Repository status
 
-The product is **`skillbrowse`**, a read-only, keyboard-first terminal application (macOS and Linux) for discovering and reading AI-agent skills (`SKILL.md` files) installed across tools like Claude Code, Cursor, Codex, Hermes, and generic `~/.agents` layouts. Implementation is in progress, following `docs/skillbrowse-implementation-plan.md`'s phased sequence. Done: Phase 0 (scaffolding), Phase 1 (catalog core), Phase 2 (the Bubble Tea TUI), Phase 3 (the self-updater), Phase 4 (error-taxonomy/exit-code correctness and diagnostics), and Phase 5 (performance validation — benchmarks and memory/goroutine-leak tests against design doc §10's NFR-01–04/07 targets; see `tasks/todo.md` for the numbers). Not yet built: the release pipeline (Phase 6). The TUI has not been verified against a real terminal/pty in this environment — only unit-tested and smoke-tested non-interactively — so a manual `go run ./cmd/skillbrowse` check is recommended before treating it as done. Self-updating won't actually succeed yet: `update.DefaultVerifier()` has no embedded trusted key until Phase 6 sets up real release signing, so `upgrade` will correctly fail signature verification for now.
+The product is **`skillbrowse`**, a read-only, keyboard-first terminal application (macOS and Linux) for discovering and reading AI-agent skills (`SKILL.md` files) installed across tools like Claude Code, Cursor, Codex, Hermes, and generic `~/.agents` layouts. All 7 phases of `docs/skillbrowse-implementation-plan.md` are implemented — see `tasks/todo.md` for the full history and current caveats. The TUI has not been verified against a real terminal/pty in this environment — only unit-tested and smoke-tested non-interactively — so a manual `go run ./cmd/skillbrowse` check is worth doing before relying on a UI change. Self-updating requires the `SKILLBROWSE_SIGNING_KEY` GitHub Actions secret to be configured (see `internal/update/verify.go`'s comment) before any real release can be signed; until a release exists, `upgrade` correctly fails at the network-lookup step (no releases published yet).
 
 The authoritative specs are:
 
@@ -47,7 +47,10 @@ internal/update       release lookup, verification, staging, replacement
 internal/buildinfo    version and build metadata
 internal/debug        opt-in SKILLBROWSE_DEBUG=1 stderr diagnostic log
 internal/benchfixture synthetic skill-tree generator for performance tests/benchmarks
+tools/checksum-signer release-workflow helper: signs checksums.txt with the Ed25519 key (never run by end users)
 ```
+
+Release infrastructure: `.goreleaser.yaml` (build/archive/checksum/sign/SBOM config), `.github/workflows/ci.yml` (lint/test/vuln/build-matrix on every push/PR), `.github/workflows/release.yml` (on `vX.Y.Z` tag: build, sign, publish, then smoke-test the published archives on real macOS Intel/Apple-Silicon and Linux amd64 runners, plus linux/arm64 under QEMU), `install.sh` (checksum-verified install script).
 
 Data flow: built-in registry + validated custom sources → discovery scanner → metadata parser → catalog normalizer → immutable catalog snapshot → Bubble Tea UI (rescan loops back to the scanner; explicit update requests go to the updater → GitHub Releases).
 

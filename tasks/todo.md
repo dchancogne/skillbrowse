@@ -61,11 +61,16 @@ Confirmed decisions: module path `github.com/dchancogne/skillbrowse`, Cobra for 
 - [x] Goroutine-leak check on cancellation (NFR-07) — `internal/discovery/leak_test.go` via `go.uber.org/goleak`, covering both the cancelled-mid-scan and normal-completion paths (goroutines only actually originate in discovery's worker pool; the UI's cancellation wiring that calls into it was already exercised by Phase 2's rescan/quit tests)
 
 ## Phase 6 — Release pipeline
-- [ ] GoReleaser config (macOS/Linux × amd64/arm64, checksums, signing, provenance/SBOM)
-- [ ] GitHub Actions CI (lint/test/race/vuln/build) + release smoke tests
-- [ ] Install script with in-app-equivalent verification
-- [ ] User docs (config, keys, diagnostics, privacy, upgrading, uninstalling)
-- [ ] Update root `CLAUDE.md` with real build/lint/test commands
+- [x] Generated the real Ed25519 signing key pair. Public key embedded in `internal/update/verify.go` (`signingKeyHex`). Private key given to the user once (not stored anywhere in this repo or elsewhere in this session) — **⚠️ action required: add it as the `SKILLBROWSE_SIGNING_KEY` GitHub Actions repository secret before the release workflow can sign a release.** See `internal/update/verify.go`'s comment for key-rotation steps if it's ever compromised.
+- [x] `tools/checksum-signer` — small standalone Go tool the release workflow uses to sign `checksums.txt`; reads the private key only from the `SKILLBROWSE_SIGNING_KEY` env var (never a CLI arg). Not part of the `skillbrowse` binary itself.
+- [x] `.goreleaser.yaml` — macOS/Linux × amd64/arm64 builds, archive naming matches `internal/update.AssetName` exactly, SHA-256 checksums, Ed25519 signing via `tools/checksum-signer`, per-archive SBOMs (syft). Validated with a full local `goreleaser release --snapshot --clean` run (real throwaway keypair, all 4 platform archives built, SBOMs generated, signature verified against the throwaway public key, extracted binary's `version` output matched the injected ldflags version).
+- [x] `.github/workflows/ci.yml` — gofmt/vet/test-race (ubuntu+macos), golangci-lint, govulncheck, 4-way cross-compile matrix, on every push/PR.
+- [x] `.github/workflows/release.yml` — on `vX.Y.Z` tag push: test, GoReleaser (build/sign/publish/SBOM), GitHub build-provenance attestation, then smoke tests that download and launch the *published* release natively on linux/amd64, darwin/amd64 (Intel runner), and darwin/arm64 (Apple Silicon runner), plus linux/arm64 under QEMU emulation.
+- [x] `install.sh` — detects OS/arch, downloads from the latest GitHub release, verifies the SHA-256 checksum (portable, always available), installs to `~/.local/bin` (or `$SKILLBROWSE_INSTALL_DIR`). Deliberately does NOT attempt Ed25519 signature verification (a shell script can't meaningfully bootstrap trust in itself before it's run) — full verification happens on every subsequent `skillbrowse upgrade`. Passes `shellcheck -s sh`; checksum-verification logic tested directly (good checksum passes, tampered checksum aborts).
+- [x] User docs — README.md rewritten: installing, verifying releases (tested, working OpenSSL Ed25519 verification command), full keymap, configuration, diagnostics/privacy, upgrading, uninstalling, and a "cutting a release" section for maintainers.
+- [x] Root `CLAUDE.md` already had real build/lint/test commands since Phase 0; added a benchmark command earlier (Phase 5) and this phase's new packages to the architecture list.
+- [x] Added `LICENSE` (MIT, per the repo owner's choice) — `.goreleaser.yaml`'s archive `files: [LICENSE*, README.md]` glob now matches it.
+- **Known gap, not addressed**: no native GitHub-hosted linux/arm64 runner exists, so that combination is only smoke-tested under QEMU emulation in `release.yml`, not on real arm64 hardware (darwin/arm64 *is* tested on real Apple Silicon via the `macos-14` runner).
 
 ## Review
 _(fill in after implementation: what changed, deviations from plan, follow-ups)_
