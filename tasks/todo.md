@@ -6,12 +6,12 @@ Source specs: `docs/skillbrowse-project-brief.md`, `docs/superpowers/specs/2026-
 Confirmed decisions: module path `github.com/dchancogne/skillbrowse`, Cobra for CLI routing.
 
 ## Phase 0 — Project scaffolding
-- [ ] `go.mod` (module `github.com/dchancogne/skillbrowse`, Go 1.26)
-- [ ] Package skeleton: `cmd/skillbrowse`, `internal/{config,sources,discovery,skill,catalog,ui,markdown,update,buildinfo}`
-- [ ] `.golangci.yml` static analysis config
-- [ ] `Makefile`/`justfile` with `build`, `test`, `test-race`, `lint`, `vuln` targets
-- [ ] `internal/buildinfo` (version/commit/date/Go/OS/arch via `-ldflags`)
-- [ ] `cmd/skillbrowse/main.go` with Cobra: root (TUI), `upgrade`, `version`, `help`; flags `--config`, `--path`, `--no-defaults`, `--no-color`
+- [x] `go.mod` (module `github.com/dchancogne/skillbrowse`, Go 1.26)
+- [x] Package skeleton: `cmd/skillbrowse`, `internal/{config,sources,discovery,skill,catalog,ui,markdown,update,buildinfo}`
+- [x] `.golangci.yml` static analysis config
+- [x] `Makefile` with `build`, `test`, `test-race`, `lint`, `vuln` targets
+- [x] `internal/buildinfo` (version/commit/date/Go/OS/arch via `-ldflags`)
+- [x] `cmd/skillbrowse/main.go` with Cobra: root (TUI), `upgrade`, `version`, `help`; flags `--config`, `--path`, `--no-defaults`, `--no-color`
 
 ## Phase 1 — Catalog core
 - [ ] `internal/config`: TOML load/validate, XDG default path resolution

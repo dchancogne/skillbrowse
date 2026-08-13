@@ -1,0 +1,13 @@
+version: "2"
+
+linters:
+  default: standard
+  enable:
+    - unconvert
+    - unparam
+    - misspell
+
+formatters:
+  enable:
+    - gofmt
+    - goimports

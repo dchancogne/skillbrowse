@@ -4,18 +4,31 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Repository status
 
-This repository currently contains only planning documents — there is no source code yet. The product being planned is **`skillbrowse`**, a read-only, keyboard-first terminal application (macOS and Linux) for discovering and reading AI-agent skills (`SKILL.md` files) installed across tools like Claude Code, Cursor, Codex, Hermes, and generic `~/.agents` layouts.
+The product is **`skillbrowse`**, a read-only, keyboard-first terminal application (macOS and Linux) for discovering and reading AI-agent skills (`SKILL.md` files) installed across tools like Claude Code, Cursor, Codex, Hermes, and generic `~/.agents` layouts. Implementation is in progress, following `docs/skillbrowse-implementation-plan.md`'s phased sequence (Phase 0 scaffolding is done; the catalog core, TUI, updater, diagnostics, performance validation, and release pipeline are not yet built).
 
 The authoritative specs are:
 
 - `docs/skillbrowse-project-brief.md` — product brief: problem, scope, UX principles, success measures.
 - `docs/superpowers/specs/2026-08-12-skillbrowse-design.md` — full product requirements and technical design (UX detail, CLI surface, discovery model, package architecture, error handling, performance/security requirements, testing strategy, release process).
+- `docs/skillbrowse-implementation-plan.md` — the phased build plan derived from the two docs above; check `tasks/todo.md` for current progress against it.
 
-Read both before starting implementation — the design doc is the detailed source of truth and the brief is its companion summary. There is no `go.mod`, build tooling, or test suite yet, so there are no build/lint/test commands to run until that scaffolding is created.
+Read the specs before extending implementation — the design doc is the detailed source of truth and the brief is its companion summary.
+
+## Commands
+
+```
+make build       # go build -o bin/skillbrowse ./cmd/skillbrowse
+make test         # go test ./...
+make test-race    # go test -race ./...
+make lint         # golangci-lint run ./...
+make vuln         # govulncheck ./... (go install golang.org/x/vuln/cmd/govulncheck@latest if missing)
+```
+
+Run a single test: `go test ./internal/<package>/... -run TestName`.
 
 ## Planned architecture (from the design doc)
 
-Once implementation begins, the design specifies a modular, in-memory Go application (Go 1.26) using the Charm v2 ecosystem — Bubble Tea v2 (app state/events), Bubbles v2 (list/input/viewport/spinner/help components), Lip Gloss v2 (responsive layout/styling), and Glamour v2 (Markdown rendering). No database; GoReleaser + GitHub Releases handle distribution.
+The design specifies a modular, in-memory Go application (Go 1.26) using the Charm v2 ecosystem — Bubble Tea v2 (app state/events), Bubbles v2 (list/input/viewport/spinner/help components), Lip Gloss v2 (responsive layout/styling), and Glamour v2 (Markdown rendering). No database; GoReleaser + GitHub Releases handle distribution. CLI routing uses Cobra (`cmd/skillbrowse`: root command launches the TUI, plus `upgrade [--check] [--yes]`, `version`, `help`).
 
 Package boundaries are intentionally decoupled — filesystem discovery has no dependency on terminal components, the updater has no dependency on the catalog, and the UI receives catalog snapshots/diagnostics via messages rather than touching the filesystem directly:
 
