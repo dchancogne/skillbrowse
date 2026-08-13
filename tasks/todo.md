@@ -16,6 +16,7 @@ Confirmed decisions: module path `github.com/dchancogne/skillbrowse`, Cobra for 
 ## Phase 1 — Catalog core
 - [x] `internal/config`: TOML load/validate, XDG default path resolution
 - [x] `internal/sources`: built-in registry (Agent Skills, Claude Code x2, Cursor, Codex x2, Hermes) + custom source merge
+- **Deliberate deviation from design doc §5.1 (2026-08-13)**: removed the "Claude Code plugin cache" (`~/.claude/plugins/cache`) and "Codex plugin cache" (`~/.codex/plugins/cache`) built-in sources at the user's request — plugin-cache skills were noisy/unwanted in the default catalog. The registry now only scans direct `~/.<agent>/skills` folders (5 sources instead of 7). `internal/sources/sources.go`'s `Registry()` doc comment explains how to reinstate a plugin-cache-style source (deeper `MaxDepth`) if wanted later. The design doc itself is intentionally left unedited (it's the external spec); this is a tracked, temporary implementation deviation, not a spec change.
 - [x] `internal/discovery`: bounded concurrent walker, symlink rules, cancellation
 - [x] `internal/skill`: front-matter parser, fallbacks, 2 MiB cap, diagnostics
 - [x] `internal/catalog`: merge/dedup, deterministic sort, fuzzy search (`github.com/sahilm/fuzzy`)

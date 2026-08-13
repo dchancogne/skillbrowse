@@ -18,8 +18,8 @@ func TestRegistry_RootsUnderHome(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(reg) != 7 {
-		t.Fatalf("expected 7 built-in sources, got %d", len(reg))
+	if len(reg) != 5 {
+		t.Fatalf("expected 5 built-in sources, got %d", len(reg))
 	}
 	for _, s := range reg {
 		if !strings.HasPrefix(s.Root, home) {
@@ -31,18 +31,26 @@ func TestRegistry_RootsUnderHome(t *testing.T) {
 	}
 }
 
-func TestRegistry_PluginCachesHaveDeeperMaxDepth(t *testing.T) {
+func TestRegistry_AllBuiltinsUseDirectMaxDepth(t *testing.T) {
 	reg, err := Registry()
 	if err != nil {
 		t.Fatal(err)
 	}
 	for _, s := range reg {
-		wantDirect := s.Label == "Claude Code plugin cache" || s.Label == "Codex plugin cache"
-		if wantDirect && s.MaxDepth != pluginCacheMaxDepth {
-			t.Errorf("%q MaxDepth = %d, want %d", s.Label, s.MaxDepth, pluginCacheMaxDepth)
-		}
-		if !wantDirect && s.MaxDepth != directMaxDepth {
+		if s.MaxDepth != directMaxDepth {
 			t.Errorf("%q MaxDepth = %d, want %d", s.Label, s.MaxDepth, directMaxDepth)
+		}
+	}
+}
+
+func TestRegistry_ExcludesPluginCaches(t *testing.T) {
+	reg, err := Registry()
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, s := range reg {
+		if strings.Contains(s.Label, "plugin") {
+			t.Errorf("expected no plugin-cache sources in the built-in registry, found %q", s.Label)
 		}
 	}
 }
@@ -106,7 +114,7 @@ func TestLoad_CombinesAllThree(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(got) != 7+1+1 {
-		t.Fatalf("expected 9 combined sources, got %d", len(got))
+	if len(got) != 5+1+1 {
+		t.Fatalf("expected 7 combined sources, got %d", len(got))
 	}
 }

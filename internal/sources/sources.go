@@ -11,13 +11,19 @@ import (
 	"github.com/dchancogne/skillbrowse/internal/config"
 )
 
-// Depth bounds applied to built-in registry roots. Direct roots contain
-// skill directories as immediate children; plugin-cache roots need a
-// deeper, still-bounded scan to reach nested "skills" directories.
+// Depth bound applied to built-in registry roots: each is a direct
+// "skills" directory whose immediate children are skill directories.
+//
+// The built-in registry previously also scanned each agent's plugin
+// cache (e.g. ~/.claude/plugins/cache, ~/.codex/plugins/cache) at a
+// deeper bound to reach nested "skills" directories, per design doc
+// §5.1. That's deliberately disabled for now at the user's request —
+// plugin-cache skills were noisy/unwanted in the default catalog. To
+// reinstate a source like that, add a registry entry with a deeper
+// MaxDepth (6 was previously used) pointed at the plugin cache root.
 const (
-	directMaxDepth      = 1
-	pluginCacheMaxDepth = 6
-	cliSourceMaxDepth   = config.DefaultMaxDepth
+	directMaxDepth    = 1
+	cliSourceMaxDepth = config.DefaultMaxDepth
 )
 
 // Origin identifies where a Source came from, for diagnostics.
@@ -57,10 +63,8 @@ func Registry() ([]Source, error) {
 	return []Source{
 		{Label: "Agent Skills", Agents: []string{"Agent Skills"}, Root: root(".agents", "skills"), MaxDepth: directMaxDepth, Origin: OriginBuiltin},
 		{Label: "Claude Code", Agents: []string{"Claude Code"}, Root: root(".claude", "skills"), MaxDepth: directMaxDepth, Origin: OriginBuiltin},
-		{Label: "Claude Code plugin cache", Agents: []string{"Claude Code"}, Root: root(".claude", "plugins", "cache"), MaxDepth: pluginCacheMaxDepth, Origin: OriginBuiltin},
 		{Label: "Cursor", Agents: []string{"Cursor"}, Root: root(".cursor", "skills"), MaxDepth: directMaxDepth, Origin: OriginBuiltin},
 		{Label: "Codex", Agents: []string{"Codex"}, Root: root(".codex", "skills"), MaxDepth: directMaxDepth, Origin: OriginBuiltin},
-		{Label: "Codex plugin cache", Agents: []string{"Codex"}, Root: root(".codex", "plugins", "cache"), MaxDepth: pluginCacheMaxDepth, Origin: OriginBuiltin},
 		{Label: "Hermes", Agents: []string{"Hermes"}, Root: root(".hermes", "skills"), MaxDepth: directMaxDepth, Origin: OriginBuiltin},
 	}, nil
 }
