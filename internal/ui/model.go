@@ -115,7 +115,7 @@ func New(srcs []sources.Source, opts ...Option) *Model {
 		m.home = home
 	}
 
-	delegate := list.NewDefaultDelegate()
+	delegate := newSkillDelegate()
 	l := list.New(nil, delegate, 0, 0)
 	l.Title = "Skills"
 	l.SetShowTitle(true)

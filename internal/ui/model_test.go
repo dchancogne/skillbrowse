@@ -110,6 +110,23 @@ func drain(m *Model, cmd tea.Cmd) {
 	m.Update(msg)
 }
 
+func TestModel_ListShowsVersionPathAgentsAndSource(t *testing.T) {
+	root := t.TempDir()
+	writeSkill(t, filepath.Join(root, "alpha"), "---\nname: Alpha\ndescription: First skill.\nversion: 1.2.3\n---\nBody.\n")
+	srcs := []sources.Source{{Label: "My Source", Agents: []string{"Claude Code"}, Root: root, MaxDepth: 1}}
+
+	// Wide enough that the list pane doesn't truncate before "Source:
+	// My Source" and the tail of the (deep, OS-temp-dir-based) path.
+	m := newTestModel(t, 400, 40, srcs)
+	view := stripANSI(m.View().Content)
+
+	for _, want := range []string{"Alpha", "v1.2.3", "First skill.", "Agents: Claude Code", "Source: My Source", "alpha"} {
+		if !strings.Contains(view, want) {
+			t.Errorf("view missing %q: %q", want, view)
+		}
+	}
+}
+
 func TestModel_ScanPopulatesListAndFooterCounts(t *testing.T) {
 	srcs := twoSkillSources(t)
 	m := newTestModel(t, 120, 40, srcs)

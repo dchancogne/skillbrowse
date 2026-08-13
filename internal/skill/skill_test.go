@@ -35,6 +35,33 @@ func TestParse_FrontMatterNameAndDescription(t *testing.T) {
 	}
 }
 
+func TestParse_Version(t *testing.T) {
+	dir, path := writeSkill(t, "---\nname: My Skill\nversion: 1.2.3\n---\nBody.\n")
+	p := Parse(dir, path)
+	if p.Version != "1.2.3" {
+		t.Errorf("Version = %q", p.Version)
+	}
+}
+
+func TestParse_VersionAsUnquotedNumberDoesNotBreakParsing(t *testing.T) {
+	dir, path := writeSkill(t, "---\nname: My Skill\nversion: 1.0\n---\nBody.\n")
+	p := Parse(dir, path)
+	if p.Version != "1.0" {
+		t.Errorf("Version = %q", p.Version)
+	}
+	if len(p.Diagnostics) != 0 {
+		t.Errorf("unexpected diagnostics: %v", p.Diagnostics)
+	}
+}
+
+func TestParse_MissingVersionIsEmpty(t *testing.T) {
+	dir, path := writeSkill(t, "---\nname: My Skill\n---\nBody.\n")
+	p := Parse(dir, path)
+	if p.Version != "" {
+		t.Errorf("Version = %q, want empty", p.Version)
+	}
+}
+
 func TestParse_WhitespaceNormalized(t *testing.T) {
 	dir, path := writeSkill(t, "---\nname: \"  My   Skill  \"\ndescription: \"  Does   the\n  thing.  \"\n---\nBody.\n")
 	p := Parse(dir, path)

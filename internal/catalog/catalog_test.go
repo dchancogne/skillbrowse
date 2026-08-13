@@ -153,6 +153,18 @@ func TestSearch_CaseInsensitive(t *testing.T) {
 	}
 }
 
+func TestBuild_PreservesVersion(t *testing.T) {
+	candidates := []discovery.Candidate{candidate("A", []string{"A"}, "/skills/a", "/a")}
+	parse := fakeParse(map[string]skill.Parsed{
+		"/skills/a": {Name: "A", Version: "1.2.3"},
+	})
+
+	cat := Build(candidates, parse)
+	if cat.Skills[0].Version != "1.2.3" {
+		t.Errorf("Version = %q, want %q", cat.Skills[0].Version, "1.2.3")
+	}
+}
+
 func TestBuild_PreservesModifiedAtAndContent(t *testing.T) {
 	when := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
 	candidates := []discovery.Candidate{candidate("A", []string{"A"}, "/skills/a", "/a")}

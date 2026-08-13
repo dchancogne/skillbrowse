@@ -32,6 +32,7 @@ const (
 type Parsed struct {
 	Name        string
 	Description string
+	Version     string // optional; "" when the front matter has no version field
 	Content     string
 	ModifiedAt  time.Time
 	Oversized   bool
@@ -81,6 +82,7 @@ func Parse(canonicalPath, skillFilePath string) Parsed {
 	var diagnostics []string
 	name := fallbackName
 	description := ""
+	version := ""
 
 	if hasFrontMatter {
 		if fmErr != nil {
@@ -92,6 +94,7 @@ func Parse(canonicalPath, skillFilePath string) Parsed {
 			if d := normalizeWhitespace(fm.Description); d != "" {
 				description = truncateRunes(d, MaxDescriptionRunes)
 			}
+			version = normalizeWhitespace(fm.Version)
 		}
 	}
 
@@ -105,6 +108,7 @@ func Parse(canonicalPath, skillFilePath string) Parsed {
 	return Parsed{
 		Name:        name,
 		Description: description,
+		Version:     version,
 		Content:     content,
 		ModifiedAt:  info.ModTime(),
 		Diagnostics: diagnostics,
@@ -114,6 +118,7 @@ func Parse(canonicalPath, skillFilePath string) Parsed {
 type frontMatter struct {
 	Name        string `yaml:"name"`
 	Description string `yaml:"description"`
+	Version     string `yaml:"version"`
 }
 
 // extractFrontMatter splits a leading "---" ... "---" YAML block from the

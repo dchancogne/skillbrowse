@@ -21,6 +21,7 @@ type Skill struct {
 	ID            string
 	Name          string
 	Description   string
+	Version       string // optional; "" when SKILL.md's front matter has no version field
 	CanonicalPath string
 	SkillFilePath string
 	ObservedPaths []string
@@ -67,6 +68,7 @@ func Build(candidates []discovery.Candidate, parse ParseFunc) Catalog {
 			ID:            skillID(canonicalPath),
 			Name:          parsed.Name,
 			Description:   parsed.Description,
+			Version:       parsed.Version,
 			CanonicalPath: canonicalPath,
 			SkillFilePath: first.SkillFilePath,
 			ObservedPaths: sortedUnique(observed),
