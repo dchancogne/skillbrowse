@@ -22,14 +22,14 @@ Confirmed decisions: module path `github.com/dchancogne/skillbrowse`, Cobra for 
 - [x] Unit tests per package + integration tests with fixture trees (FR-01–05)
 
 ## Phase 2 — Interactive TUI
-- [ ] `internal/markdown`: Glamour v2 wrapper, sanitization, width-aware cache
-- [ ] `internal/ui`: wide layout (list + detail panes)
-- [ ] `internal/ui`: narrow layout (list/detail screens, Enter/Esc)
-- [ ] `internal/ui`: search (`/`, fuzzy filter, highlighting)
-- [ ] `internal/ui`: detail view + raw/rendered toggle (`v`)
-- [ ] `internal/ui`: rescan (`r`), help overlay (`?`), min-size fallback, `--no-color`/`NO_COLOR`
-- [ ] Wire default command to launch TUI
-- [ ] Golden terminal-view tests + pseudo-terminal e2e tests
+- [x] `internal/markdown`: Glamour v2 wrapper, sanitization, width-aware cache
+- [x] `internal/ui`: wide layout (list + detail panes)
+- [x] `internal/ui`: narrow layout (list/detail screens, Enter/Esc)
+- [x] `internal/ui`: search (`/`, fuzzy filter) — uses bubbles/list's own filter UI over a name/description/agent/label FilterValue (paths excluded — see internal/ui/item.go doc comment); no per-match highlighting yet
+- [x] `internal/ui`: detail view + raw/rendered toggle (`v`)
+- [x] `internal/ui`: rescan (`r`), help overlay (`?`), min-size fallback, `--no-color`/`NO_COLOR` (forced via `tea.WithColorProfile`)
+- [x] Wire default command to launch TUI
+- [ ] Golden terminal-view tests + pseudo-terminal e2e tests — not done; instead internal/ui/model_test.go unit-tests Update/View directly (navigation, search, narrow/wide, raw toggle, rescan-preserves-selection, help, too-small, quit). No real-terminal/pty verification was possible in this environment; manual `go run ./cmd/skillbrowse` smoke test still recommended before release.
 
 ## Phase 3 — Self-updater
 - [ ] `internal/update`: GitHub latest-release lookup, asset matching

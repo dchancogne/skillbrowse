@@ -111,7 +111,7 @@ func Search(skills []Skill, query string) []Skill {
 
 	searchable := make([]string, len(skills))
 	for i, s := range skills {
-		searchable[i] = searchableText(s)
+		searchable[i] = SearchableText(s)
 	}
 
 	matches := fuzzy.Find(query, searchable)
@@ -126,7 +126,10 @@ func Search(skills []Skill, query string) []Skill {
 	return result
 }
 
-func searchableText(s Skill) string {
+// SearchableText concatenates the fields Search matches against, per
+// design doc §6: name, description, agents, source labels, observed
+// paths, and canonical path.
+func SearchableText(s Skill) string {
 	return strings.Join([]string{
 		s.Name,
 		s.Description,

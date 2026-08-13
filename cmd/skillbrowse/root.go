@@ -1,9 +1,15 @@
 package main
 
 import (
-	"fmt"
+	"os"
 
+	tea "charm.land/bubbletea/v2"
+	"github.com/charmbracelet/colorprofile"
 	"github.com/spf13/cobra"
+
+	"github.com/dchancogne/skillbrowse/internal/config"
+	"github.com/dchancogne/skillbrowse/internal/sources"
+	"github.com/dchancogne/skillbrowse/internal/ui"
 )
 
 // rootFlags holds the persistent flags described in
@@ -55,7 +61,7 @@ func newRootCmd() *cobra.Command {
 		SilenceUsage:  true,
 		SilenceErrors: true,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return runTUI(cmd)
+			return runTUI(cmd, flags)
 		},
 	}
 
@@ -70,12 +76,42 @@ func newRootCmd() *cobra.Command {
 	return cmd
 }
 
-// runTUI will launch the Bubble Tea catalog browser once
-// internal/catalog and internal/ui exist (Phase 1 and Phase 2 of
-// docs/skillbrowse-implementation-plan.md). It will take rootFlags once
-// they're needed to build the source list. For now it reports that the
-// scaffolding is not yet wired up.
-func runTUI(cmd *cobra.Command) error {
-	_, err := fmt.Fprintln(cmd.OutOrStdout(), "skillbrowse: catalog and TUI are not implemented yet (Phase 0 scaffolding only)")
+// runTUI resolves sources (built-in registry + config + --path) and
+// launches the Bubble Tea catalog browser.
+func runTUI(cmd *cobra.Command, flags *rootFlags) error {
+	configPath := flags.config
+	if configPath == "" {
+		p, err := config.DefaultPath()
+		if err != nil {
+			return err
+		}
+		configPath = p
+	}
+
+	cfg, err := config.Load(configPath)
+	if err != nil {
+		return &usageError{err: err}
+	}
+
+	srcs, err := sources.Load(cfg, flags.paths, flags.noDefaults)
+	if err != nil {
+		return err
+	}
+
+	noColor := flags.noColor || os.Getenv("NO_COLOR") != ""
+
+	model := ui.New(srcs, ui.WithNoColor(noColor))
+	progOpts := []tea.ProgramOption{
+		tea.WithInput(cmd.InOrStdin()),
+		tea.WithOutput(cmd.OutOrStdout()),
+	}
+	if noColor {
+		// Force the whole program (list, help, viewport styling — not
+		// just skillbrowse's own header/footer strings) to emit no ANSI
+		// codes at all, per design doc §13 ("NO_COLOR and --no-color
+		// are honored").
+		progOpts = append(progOpts, tea.WithColorProfile(colorprofile.Ascii))
+	}
+	_, err = tea.NewProgram(model, progOpts...).Run()
 	return err
 }
