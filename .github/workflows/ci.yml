@@ -47,7 +47,11 @@ jobs:
           go-version-file: go.mod
       - uses: golangci/golangci-lint-action@v6
         with:
-          version: latest
+          # `latest` resolved to a v1.x binary built with Go 1.24, which
+          # refuses to run against this module's `go 1.26.5` directive.
+          # Pin a v2.x release known to be built with a Go toolchain new
+          # enough for that.
+          version: v2.11.1
 
   vuln:
     runs-on: ubuntu-latest
