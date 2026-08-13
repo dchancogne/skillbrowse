@@ -32,11 +32,14 @@ Confirmed decisions: module path `github.com/dchancogne/skillbrowse`, Cobra for 
 - [ ] Golden terminal-view tests + pseudo-terminal e2e tests — not done; instead internal/ui/model_test.go unit-tests Update/View directly (navigation, search, narrow/wide, raw toggle, rescan-preserves-selection, help, too-small, quit). No real-terminal/pty verification was possible in this environment; manual `go run ./cmd/skillbrowse` smoke test still recommended before release.
 
 ## Phase 3 — Self-updater
-- [ ] `internal/update`: GitHub latest-release lookup, asset matching
-- [ ] Verification chain: signature → checksum → safe extraction → version check → atomic rename
-- [ ] Rollback invariant test (failure before rename leaves binary untouched)
-- [ ] Wire `upgrade --check/--yes` command and `u` TUI key
-- [ ] Fake release server test suite (9 cases from design doc §14.3)
+- [x] `internal/update`: GitHub latest-release lookup, asset matching
+- [x] Verification chain: signature → checksum → safe extraction → version check → atomic rename
+- [x] Rollback invariant test (failure before rename leaves binary untouched)
+- [x] Wire `upgrade --check/--yes` command and `u` TUI key (with an explicit y/n confirmation before install, per §12.1)
+- [x] Fake release server test suite (9 cases from design doc §14.3, in internal/update/apply_test.go)
+- Note: `update.DefaultVerifier()`'s trusted-key set is empty until Phase 6 generates and embeds the real Ed25519 signing key — self-update will correctly refuse to install (signature verification failure) until then. This is expected, not a bug.
+- Also fixed in this phase: `cmd/skillbrowse/main.go` never printed RunE errors (root command sets `SilenceErrors`, and nothing else wrote them anywhere) — every CLI error was silently swallowed down to just an exit code. Now printed via `fmt.Fprintln(root.ErrOrStderr(), "Error:", err)`.
+- Also bumped the Go toolchain (`go` directive) from 1.26.1 to 1.26.5: govulncheck flagged several stdlib CVEs (crypto/tls, net/http, crypto/x509, archive/tar, net/textproto) now reachable because Phase 3 added real HTTPS downloads and tar extraction.
 
 ## Phase 4 — Diagnostics, CLI polish, error taxonomy
 - [ ] Three-tier error handling (fatal/source/skill) with correct exit codes

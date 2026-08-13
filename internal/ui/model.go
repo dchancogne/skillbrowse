@@ -20,6 +20,7 @@ import (
 	"github.com/dchancogne/skillbrowse/internal/catalog"
 	"github.com/dchancogne/skillbrowse/internal/markdown"
 	"github.com/dchancogne/skillbrowse/internal/sources"
+	"github.com/dchancogne/skillbrowse/internal/update"
 )
 
 // WideBreakpoint is the terminal width at or above which the two-pane
@@ -70,6 +71,13 @@ type Model struct {
 	totalSkills  int
 	sourceCount  int
 	warningCount int
+
+	currentVersion   string
+	updateClient     *update.Client
+	updateCheck      *update.CheckResult
+	updateChecking   bool
+	updateConfirm    bool
+	updateInstalling bool
 }
 
 // Option customizes a Model returned by New.
@@ -81,17 +89,23 @@ func WithNoColor(v bool) Option { return func(m *Model) { m.noColor = v } }
 // WithDark selects the dark or light Markdown theme.
 func WithDark(v bool) Option { return func(m *Model) { m.dark = v } }
 
+// WithVersion sets the running skillbrowse version, used by the "u"
+// update check.
+func WithVersion(v string) Option { return func(m *Model) { m.currentVersion = v } }
+
 // New builds the root model. srcs is the fully resolved source list
 // (built-in registry + config + CLI paths) that rescans will walk.
 func New(srcs []sources.Source, opts ...Option) *Model {
 	m := &Model{
-		sources:     srcs,
-		dark:        true,
-		sourceCount: len(srcs),
-		mdCache:     markdown.NewCache(),
-		keys:        newAppKeyMap(),
-		help:        help.New(),
-		spinner:     spinner.New(spinner.WithSpinner(spinner.Line)),
+		sources:        srcs,
+		dark:           true,
+		sourceCount:    len(srcs),
+		mdCache:        markdown.NewCache(),
+		keys:           newAppKeyMap(),
+		help:           help.New(),
+		spinner:        spinner.New(spinner.WithSpinner(spinner.Line)),
+		currentVersion: "dev",
+		updateClient:   update.NewClient(),
 	}
 
 	if home, err := os.UserHomeDir(); err == nil {
@@ -158,6 +172,14 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case scanResultMsg:
 		return m, m.applyScanResult(msg)
 
+	case updateCheckMsg:
+		m.applyUpdateCheck(msg)
+		return m, nil
+
+	case updateApplyMsg:
+		m.applyUpdateResult(msg)
+		return m, nil
+
 	case tea.KeyPressMsg:
 		return m.handleKey(msg)
 	}
@@ -198,6 +220,35 @@ func (m *Model) applyScanResult(msg scanResultMsg) tea.Cmd {
 	return cmd
 }
 
+func (m *Model) applyUpdateCheck(msg updateCheckMsg) {
+	m.updateChecking = false
+
+	if msg.err != nil {
+		m.statusMsg = "Update check failed: " + msg.err.Error()
+		return
+	}
+
+	m.updateCheck = msg.check
+	if !msg.check.UpdateAvailable {
+		m.statusMsg = fmt.Sprintf("skillbrowse %s is up to date.", msg.check.Current)
+		return
+	}
+
+	m.updateConfirm = true
+	m.statusMsg = fmt.Sprintf("Update available: %s -> %s. Press y to install, any other key to dismiss.", msg.check.Current, msg.check.Latest)
+}
+
+func (m *Model) applyUpdateResult(msg updateApplyMsg) {
+	m.updateInstalling = false
+
+	if msg.err != nil {
+		m.statusMsg = "Update failed: " + msg.err.Error()
+		return
+	}
+
+	m.statusMsg = "Updated to " + m.updateCheck.Latest + ". Restart skillbrowse to use it."
+}
+
 func (m *Model) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	k := msg.String()
 
@@ -216,6 +267,26 @@ func (m *Model) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		case "q", "ctrl+c":
 			m.cancelScan()
 			return m, tea.Quit
+		}
+		return m, nil
+	}
+
+	// An update check found something to install: the next keypress is
+	// its explicit confirmation, per design doc §12.1 ("show an explicit
+	// confirmation before installation").
+	if m.updateConfirm {
+		switch k {
+		case "y":
+			m.updateConfirm = false
+			m.updateInstalling = true
+			m.statusMsg = "Installing " + m.updateCheck.Latest + "…"
+			return m, m.applyUpdateCmd(m.updateCheck)
+		case "q", "ctrl+c":
+			m.cancelScan()
+			return m, tea.Quit
+		default:
+			m.updateConfirm = false
+			m.statusMsg = "Update cancelled."
 		}
 		return m, nil
 	}
@@ -250,8 +321,12 @@ func (m *Model) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		}
 		return m, nil
 	case "u":
-		m.statusMsg = "Checking for updates is not implemented yet (Phase 3)."
-		return m, nil
+		if m.updateChecking || m.updateInstalling {
+			return m, nil
+		}
+		m.updateChecking = true
+		m.statusMsg = "Checking for updates…"
+		return m, m.checkUpdateCmd()
 	}
 
 	if m.focus == focusDetail {

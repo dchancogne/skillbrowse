@@ -1,10 +1,21 @@
 package ui
 
 import (
+	"archive/tar"
+	"bytes"
+	"compress/gzip"
 	"context"
+	"crypto/ed25519"
+	"crypto/rand"
+	"crypto/sha256"
+	"encoding/hex"
+	"encoding/json"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"regexp"
+	"runtime"
 	"strings"
 	"testing"
 
@@ -13,6 +24,7 @@ import (
 	"github.com/dchancogne/skillbrowse/internal/catalog"
 	"github.com/dchancogne/skillbrowse/internal/discovery"
 	"github.com/dchancogne/skillbrowse/internal/sources"
+	"github.com/dchancogne/skillbrowse/internal/update"
 )
 
 // ansiSeq strips ANSI escape sequences from rendered views. Outside a real
@@ -271,12 +283,128 @@ func TestModel_SearchFiltersList(t *testing.T) {
 	}
 }
 
-func TestModel_UpdateKeyShowsNotImplementedStatus(t *testing.T) {
+// updateFixtureServer is a minimal fake GitHub release server, just
+// enough to exercise the "u" key's check/confirm/install state machine.
+// internal/update/apply_test.go covers the full verification matrix
+// (bad signature, bad checksum, etc.) in detail; this only needs to
+// prove the UI wiring reacts correctly to CheckForUpdate/Apply results.
+func updateFixtureServer(t *testing.T, tag, version string) *httptest.Server {
+	t.Helper()
+	_, priv, err := ed25519.GenerateKey(rand.Reader)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	assetName := update.AssetName(runtime.GOOS, runtime.GOARCH)
+
+	var archiveBuf bytes.Buffer
+	gz := gzip.NewWriter(&archiveBuf)
+	tw := tar.NewWriter(gz)
+	content := []byte("#!/bin/sh\necho \"skillbrowse " + version + "\"\n")
+	if err := tw.WriteHeader(&tar.Header{Name: "skillbrowse", Size: int64(len(content)), Mode: 0o755}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := tw.Write(content); err != nil {
+		t.Fatal(err)
+	}
+	if err := tw.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if err := gz.Close(); err != nil {
+		t.Fatal(err)
+	}
+
+	sum := sha256.Sum256(archiveBuf.Bytes())
+	checksums := []byte(hex.EncodeToString(sum[:]) + "  " + assetName + "\n")
+	sig := ed25519.Sign(priv, checksums)
+
+	assets := map[string][]byte{
+		assetName:                 archiveBuf.Bytes(),
+		update.ChecksumsAssetName: checksums,
+		update.SignatureAssetName: sig,
+	}
+
+	var srv *httptest.Server // referenced by the closure below; assigned once the server exists
+
+	mux := http.NewServeMux()
+	mux.HandleFunc("/repos/dchancogne/skillbrowse/releases/latest", func(w http.ResponseWriter, r *http.Request) {
+		release := update.Release{TagName: tag, HTMLURL: "https://example.invalid/" + tag}
+		for name, data := range assets {
+			release.Assets = append(release.Assets, update.Asset{Name: name, BrowserDownloadURL: srv.URL + "/assets/" + name, Size: int64(len(data))})
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(release)
+	})
+	mux.HandleFunc("/assets/", func(w http.ResponseWriter, r *http.Request) {
+		_, _ = w.Write(assets[r.URL.Path[len("/assets/"):]])
+	})
+
+	srv = httptest.NewServer(mux)
+	t.Cleanup(srv.Close)
+
+	return srv
+}
+
+func TestModel_UpdateKey_NoUpdateAvailable(t *testing.T) {
 	srcs := twoSkillSources(t)
 	m := newTestModel(t, 120, 40, srcs)
+	srv := updateFixtureServer(t, "v1.0.0", "1.0.0")
+	m.updateClient.APIBaseURL = srv.URL
+	m.currentVersion = "1.0.0"
 
-	pressKey(m, "u")
-	if !strings.Contains(m.statusMsg, "not implemented") {
-		t.Errorf("statusMsg = %q, want a not-implemented notice", m.statusMsg)
+	drain(m, pressKey(m, "u"))
+	if !strings.Contains(m.statusMsg, "up to date") {
+		t.Errorf("statusMsg = %q, want an up-to-date notice", m.statusMsg)
+	}
+}
+
+func TestModel_UpdateKey_FindsUpdateAndConfirms(t *testing.T) {
+	srcs := twoSkillSources(t)
+	m := newTestModel(t, 120, 40, srcs)
+	srv := updateFixtureServer(t, "v1.2.0", "1.2.0")
+	m.updateClient.APIBaseURL = srv.URL
+	m.currentVersion = "1.0.0"
+
+	drain(m, pressKey(m, "u"))
+	if !m.updateConfirm {
+		t.Fatalf("expected updateConfirm = true after finding an update, statusMsg = %q", m.statusMsg)
+	}
+	if !strings.Contains(m.statusMsg, "1.0.0") || !strings.Contains(m.statusMsg, "1.2.0") {
+		t.Errorf("statusMsg = %q, want it to mention both versions", m.statusMsg)
+	}
+
+	// Dismissing with any key other than "y" cancels without installing.
+	pressKey(m, "n")
+	if m.updateConfirm {
+		t.Error("expected updateConfirm = false after dismissing")
+	}
+	if !strings.Contains(m.statusMsg, "cancelled") {
+		t.Errorf("statusMsg = %q, want a cancellation notice", m.statusMsg)
+	}
+}
+
+func TestModel_UpdateKey_ConfirmInstallSurfacesVerificationFailure(t *testing.T) {
+	srcs := twoSkillSources(t)
+	m := newTestModel(t, 120, 40, srcs)
+	srv := updateFixtureServer(t, "v1.2.0", "1.2.0")
+	m.updateClient.APIBaseURL = srv.URL
+	m.currentVersion = "1.0.0"
+
+	drain(m, pressKey(m, "u"))
+	if !m.updateConfirm {
+		t.Fatalf("expected updateConfirm = true, statusMsg = %q", m.statusMsg)
+	}
+
+	// Pressing "y" drives the real applyUpdateCmd, which uses
+	// update.DefaultVerifier() — empty until Phase 6 embeds a real
+	// signing key. That failure should surface as a status message, not
+	// a crash: this confirms the "y" confirmation path is wired to a
+	// real install attempt.
+	drain(m, pressKey(m, "y"))
+	if m.updateInstalling {
+		t.Error("expected updateInstalling = false once the (failed) install completed")
+	}
+	if !strings.Contains(m.statusMsg, "Update failed") {
+		t.Errorf("statusMsg = %q, want an install failure notice", m.statusMsg)
 	}
 }

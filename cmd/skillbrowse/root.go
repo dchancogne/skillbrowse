@@ -7,6 +7,7 @@ import (
 	"github.com/charmbracelet/colorprofile"
 	"github.com/spf13/cobra"
 
+	"github.com/dchancogne/skillbrowse/internal/buildinfo"
 	"github.com/dchancogne/skillbrowse/internal/config"
 	"github.com/dchancogne/skillbrowse/internal/sources"
 	"github.com/dchancogne/skillbrowse/internal/ui"
@@ -100,7 +101,7 @@ func runTUI(cmd *cobra.Command, flags *rootFlags) error {
 
 	noColor := flags.noColor || os.Getenv("NO_COLOR") != ""
 
-	model := ui.New(srcs, ui.WithNoColor(noColor))
+	model := ui.New(srcs, ui.WithNoColor(noColor), ui.WithVersion(buildinfo.Version))
 	progOpts := []tea.ProgramOption{
 		tea.WithInput(cmd.InOrStdin()),
 		tea.WithOutput(cmd.OutOrStdout()),
