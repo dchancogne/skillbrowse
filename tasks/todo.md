@@ -14,12 +14,12 @@ Confirmed decisions: module path `github.com/dchancogne/skillbrowse`, Cobra for 
 - [x] `cmd/skillbrowse/main.go` with Cobra: root (TUI), `upgrade`, `version`, `help`; flags `--config`, `--path`, `--no-defaults`, `--no-color`
 
 ## Phase 1 — Catalog core
-- [ ] `internal/config`: TOML load/validate, XDG default path resolution
-- [ ] `internal/sources`: built-in registry (Agent Skills, Claude Code x2, Cursor, Codex x2, Hermes) + custom source merge
-- [ ] `internal/discovery`: bounded concurrent walker, symlink rules, cancellation
-- [ ] `internal/skill`: front-matter parser, fallbacks, 2 MiB cap, diagnostics
-- [ ] `internal/catalog`: merge/dedup, deterministic sort, fuzzy search (`github.com/sahilm/fuzzy`)
-- [ ] Unit tests per package + integration tests with fixture trees (FR-01–05)
+- [x] `internal/config`: TOML load/validate, XDG default path resolution
+- [x] `internal/sources`: built-in registry (Agent Skills, Claude Code x2, Cursor, Codex x2, Hermes) + custom source merge
+- [x] `internal/discovery`: bounded concurrent walker, symlink rules, cancellation
+- [x] `internal/skill`: front-matter parser, fallbacks, 2 MiB cap, diagnostics
+- [x] `internal/catalog`: merge/dedup, deterministic sort, fuzzy search (`github.com/sahilm/fuzzy`)
+- [x] Unit tests per package + integration tests with fixture trees (FR-01–05)
 
 ## Phase 2 — Interactive TUI
 - [ ] `internal/markdown`: Glamour v2 wrapper, sanitization, width-aware cache

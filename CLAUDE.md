@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Repository status
 
-The product is **`skillbrowse`**, a read-only, keyboard-first terminal application (macOS and Linux) for discovering and reading AI-agent skills (`SKILL.md` files) installed across tools like Claude Code, Cursor, Codex, Hermes, and generic `~/.agents` layouts. Implementation is in progress, following `docs/skillbrowse-implementation-plan.md`'s phased sequence (Phase 0 scaffolding is done; the catalog core, TUI, updater, diagnostics, performance validation, and release pipeline are not yet built).
+The product is **`skillbrowse`**, a read-only, keyboard-first terminal application (macOS and Linux) for discovering and reading AI-agent skills (`SKILL.md` files) installed across tools like Claude Code, Cursor, Codex, Hermes, and generic `~/.agents` layouts. Implementation is in progress, following `docs/skillbrowse-implementation-plan.md`'s phased sequence. Done: Phase 0 (scaffolding) and Phase 1 (catalog core — `internal/config`, `internal/sources`, `internal/discovery`, `internal/skill`, `internal/catalog`, headlessly wired and tested end-to-end in `internal/catalog/pipeline_test.go`). Not yet built: the TUI, self-updater, diagnostics/CLI polish, performance validation, and release pipeline — the root command still just prints a stub.
 
 The authoritative specs are:
 
