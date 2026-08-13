@@ -10,6 +10,8 @@ import (
 	"path/filepath"
 	"runtime"
 	"strings"
+
+	"github.com/dchancogne/skillbrowse/internal/debug"
 )
 
 const (
@@ -116,6 +118,7 @@ func Apply(ctx context.Context, opts Options, check *CheckResult) error {
 	if err := opts.Verifier.VerifyManifestSignature(checksumsData, sigData); err != nil {
 		return fmt.Errorf("signature verification failed: %w", err)
 	}
+	debug.Log("update: signature verified")
 
 	sums, err := parseChecksums(checksumsData)
 	if err != nil {
@@ -128,6 +131,7 @@ func Apply(ctx context.Context, opts Options, check *CheckResult) error {
 	if err := verifyArchiveChecksum(archivePath, wantSum); err != nil {
 		return fmt.Errorf("checksum verification failed: %w", err)
 	}
+	debug.Log("update: checksum verified (%s)", wantSum)
 
 	binaryName := filepath.Base(execPath)
 	stagedPath, err := extractExecutable(archivePath, binaryName, installDir, maxArchiveSize)
@@ -139,6 +143,7 @@ func Apply(ctx context.Context, opts Options, check *CheckResult) error {
 			_ = os.Remove(stagedPath)
 		}
 	}()
+	debug.Log("update: extracted %s to %s", binaryName, stagedPath)
 
 	gotVersion, err := stagedVersion(ctx, stagedPath)
 	if err != nil {
@@ -147,11 +152,13 @@ func Apply(ctx context.Context, opts Options, check *CheckResult) error {
 	if gotVersion != check.Latest {
 		return fmt.Errorf("staged binary reports version %q, expected %q", gotVersion, check.Latest)
 	}
+	debug.Log("update: staged binary version confirmed (%s)", gotVersion)
 
 	if err := os.Rename(stagedPath, execPath); err != nil {
 		return fmt.Errorf("install updated binary: %w", err)
 	}
 	stagedPath = "" // renamed away; nothing left for the deferred cleanup to remove
+	debug.Log("update: installed to %s", execPath)
 
 	return nil
 }
@@ -260,6 +267,7 @@ func downloadToMemory(ctx context.Context, client *http.Client, url string, maxS
 }
 
 func doGet(ctx context.Context, client *http.Client, url string) (*http.Response, error) {
+	debug.Log("update: GET %s", url)
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {
 		return nil, err

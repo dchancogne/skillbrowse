@@ -42,10 +42,13 @@ Confirmed decisions: module path `github.com/dchancogne/skillbrowse`, Cobra for 
 - Also bumped the Go toolchain (`go` directive) from 1.26.1 to 1.26.5: govulncheck flagged several stdlib CVEs (crypto/tls, net/http, crypto/x509, archive/tar, net/textproto) now reachable because Phase 3 added real HTTPS downloads and tar extraction.
 
 ## Phase 4 — Diagnostics, CLI polish, error taxonomy
-- [ ] Three-tier error handling (fatal/source/skill) with correct exit codes
-- [ ] `SKILLBROWSE_DEBUG=1` stderr diagnostics
-- [ ] Home-relative path display, no content/stack-trace leaks
-- [ ] `skillbrowse version` full output (FR-12)
+- [x] Three-tier error handling (fatal/source/skill) with correct exit codes
+- [x] `SKILLBROWSE_DEBUG=1` stderr diagnostics (`internal/debug`, used in cmd/skillbrowse, internal/update, internal/ui)
+- [x] Home-relative path display, no content/stack-trace leaks
+- [x] `skillbrowse version` full output (FR-12) — already correct from Phase 0, now covered by cmd/skillbrowse/root_test.go
+- Bug fixed in this phase: exit code 2 ("invalid arguments or configuration") was only applied to our own `*usageError`s — Cobra's own pre-RunE errors (unknown command, unknown flag, wrong arg count) fell through to the default exit 1. Fixed with a `looksLikeUsageError` fallback matching Cobra's stable error-message prefixes, since Cobra exposes no typed error for these.
+- Added: a "Source diagnostics" section in the help overlay (`?`), listing each source-level diagnostic (missing/unreadable configured root) with home-relative path and cause — design doc §9 pairs this with the footer's warning count, but no view previously showed the detail behind that count.
+- `cmd/skillbrowse` had zero test coverage before this phase; added root_test.go (exit-code classification, version output, malformed-config/unknown-command/unknown-flag exit codes).
 
 ## Phase 5 — Performance validation
 - [ ] Synthetic fixture generator (1,000 / 10,000 skills)

@@ -11,6 +11,8 @@ import (
 	"io"
 	"net/http"
 	"time"
+
+	"github.com/dchancogne/skillbrowse/internal/debug"
 )
 
 // Owner and Repo are the compiled-in repository identity official
@@ -72,6 +74,7 @@ func NewClient() *Client {
 // is selected for a stable installed version").
 func (c *Client) LatestRelease(ctx context.Context) (*Release, error) {
 	url := fmt.Sprintf("%s/repos/%s/%s/releases/latest", c.APIBaseURL, c.Owner, c.Repo)
+	debug.Log("update: GET %s", url)
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {

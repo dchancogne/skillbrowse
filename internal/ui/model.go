@@ -18,6 +18,8 @@ import (
 	"charm.land/lipgloss/v2"
 
 	"github.com/dchancogne/skillbrowse/internal/catalog"
+	"github.com/dchancogne/skillbrowse/internal/debug"
+	"github.com/dchancogne/skillbrowse/internal/discovery"
 	"github.com/dchancogne/skillbrowse/internal/markdown"
 	"github.com/dchancogne/skillbrowse/internal/sources"
 	"github.com/dchancogne/skillbrowse/internal/update"
@@ -66,11 +68,12 @@ type Model struct {
 	showHelp  bool
 	statusMsg string
 
-	scanning     bool
-	scanCancel   context.CancelFunc
-	totalSkills  int
-	sourceCount  int
-	warningCount int
+	scanning          bool
+	scanCancel        context.CancelFunc
+	totalSkills       int
+	sourceCount       int
+	warningCount      int
+	sourceDiagnostics []discovery.Diagnostic
 
 	currentVersion   string
 	updateClient     *update.Client
@@ -200,9 +203,15 @@ func (m *Model) applyScanResult(msg scanResultMsg) tea.Cmd {
 	}
 
 	m.totalSkills = len(msg.catalog.Skills)
+	m.sourceDiagnostics = msg.result.Diagnostics
 	m.warningCount = len(msg.result.Diagnostics)
 	for _, s := range msg.catalog.Skills {
 		m.warningCount += len(s.Diagnostics)
+	}
+
+	debug.Log("scan: %d skills, %d source diagnostics, %d warnings total", m.totalSkills, len(msg.result.Diagnostics), m.warningCount)
+	for _, d := range msg.result.Diagnostics {
+		debug.Log("scan: source diagnostic: label=%q path=%q message=%q", d.SourceLabel, d.Path, d.Message)
 	}
 
 	cmd := m.list.SetItems(itemsFromSkills(msg.catalog.Skills, m.home))
@@ -455,6 +464,24 @@ func (m *Model) renderHeader(s catalog.Skill) string {
 	return b.String()
 }
 
+// renderDiagnostics is the "diagnostics view" design doc §9 pairs with
+// the footer's warning count: it lists each source-level diagnostic
+// (an explicitly configured root that was missing/unreadable) with its
+// home-relative path and cause. Skill-level diagnostics are already
+// shown per-skill in the detail pane header.
+func (m *Model) renderDiagnostics() string {
+	if len(m.sourceDiagnostics) == 0 {
+		return ""
+	}
+
+	var b strings.Builder
+	b.WriteString("\n" + m.style("Source diagnostics:", sectionStyle) + "\n")
+	for _, d := range m.sourceDiagnostics {
+		fmt.Fprintf(&b, "  %s\n", m.style(fmt.Sprintf("! [%s] %s: %s", d.SourceLabel, shortenPath(d.Path, m.home), d.Message), diagnosticStyle))
+	}
+	return b.String()
+}
+
 func (m *Model) style(s string, style lipgloss.Style) string {
 	if m.noColor {
 		return s
@@ -488,7 +515,7 @@ func (m *Model) View() tea.View {
 		))
 	}
 	if m.showHelp {
-		v := tea.NewView(m.help.View(m.keys))
+		v := tea.NewView(m.help.View(m.keys) + m.renderDiagnostics())
 		v.AltScreen = true
 		return v
 	}

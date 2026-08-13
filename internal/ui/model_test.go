@@ -233,6 +233,46 @@ func TestModel_HelpTogglesOverlay(t *testing.T) {
 	}
 }
 
+func TestModel_HelpOverlayShowsSourceDiagnostics(t *testing.T) {
+	if runtime.GOOS == "windows" || os.Geteuid() == 0 {
+		t.Skip("requires enforceable Unix permission bits")
+	}
+
+	root := t.TempDir()
+	writeSkill(t, filepath.Join(root, "alpha"), "---\nname: Alpha\n---\nBody.\n")
+	blocked := filepath.Join(root, "blocked")
+	if err := os.MkdirAll(blocked, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Chmod(blocked, 0o000); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() {
+		if err := os.Chmod(blocked, 0o755); err != nil {
+			t.Logf("cleanup: chmod %s: %s", blocked, err)
+		}
+	})
+
+	// MaxDepth 2, not 1: the walker only attempts to read a directory's
+	// contents when it intends to recurse further, so an unreadable
+	// directory sitting exactly at MaxDepth would never be listed at all.
+	srcs := []sources.Source{{Label: "Test", Agents: []string{"Test"}, Root: root, MaxDepth: 2}}
+	m := newTestModel(t, 120, 40, srcs)
+
+	if len(m.sourceDiagnostics) != 1 {
+		t.Fatalf("expected 1 source diagnostic, got %+v", m.sourceDiagnostics)
+	}
+
+	pressKey(m, "?")
+	help := stripANSI(m.View().Content)
+	if !strings.Contains(help, "Source diagnostics:") {
+		t.Errorf("help view missing diagnostics section: %q", help)
+	}
+	if !strings.Contains(help, "blocked") {
+		t.Errorf("help view missing diagnostic path: %q", help)
+	}
+}
+
 func TestModel_TooSmallShowsFallbackMessage(t *testing.T) {
 	srcs := twoSkillSources(t)
 	m := New(srcs, WithNoColor(true))

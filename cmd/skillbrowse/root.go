@@ -2,6 +2,7 @@ package main
 
 import (
 	"os"
+	"strings"
 
 	tea "charm.land/bubbletea/v2"
 	"github.com/charmbracelet/colorprofile"
@@ -9,6 +10,7 @@ import (
 
 	"github.com/dchancogne/skillbrowse/internal/buildinfo"
 	"github.com/dchancogne/skillbrowse/internal/config"
+	"github.com/dchancogne/skillbrowse/internal/debug"
 	"github.com/dchancogne/skillbrowse/internal/sources"
 	"github.com/dchancogne/skillbrowse/internal/ui"
 )
@@ -32,10 +34,41 @@ func (e *usageError) Unwrap() error { return e.err }
 
 func exitCodeFor(err error) int {
 	var u *usageError
-	if asUsageError(err, &u) {
+	if asUsageError(err, &u) || looksLikeUsageError(err) {
 		return 2
 	}
 	return 1
+}
+
+// looksLikeUsageError recognizes Cobra's own pre-RunE errors (unknown
+// command, unknown flag, wrong argument count, ...), which are always
+// invalid-syntax problems per design doc §4 but arrive as plain,
+// untyped errors — Cobra has no typed error for them to check with
+// errors.As, and SetFlagErrorFunc only covers flag-parsing errors, not
+// command-routing ones like "unknown command". Matching on Cobra's own
+// stable error-message prefixes is the pragmatic alternative.
+func looksLikeUsageError(err error) bool {
+	if err == nil {
+		return false
+	}
+	msg := err.Error()
+	for _, prefix := range []string{
+		"unknown command",
+		"unknown flag",
+		"unknown shorthand flag",
+		"flag needs an argument",
+		"invalid argument",
+		"requires at least",
+		"requires exactly",
+		"accepts at most",
+		"accepts between",
+		"bad flag syntax",
+	} {
+		if strings.HasPrefix(msg, prefix) {
+			return true
+		}
+	}
+	return false
 }
 
 func asUsageError(err error, target **usageError) bool {
@@ -89,14 +122,20 @@ func runTUI(cmd *cobra.Command, flags *rootFlags) error {
 		configPath = p
 	}
 
+	debug.Log("config path: %s", configPath)
+
 	cfg, err := config.Load(configPath)
 	if err != nil {
 		return &usageError{err: err}
 	}
+	debug.Log("config: version=%d sources=%d", cfg.Version, len(cfg.Sources))
 
 	srcs, err := sources.Load(cfg, flags.paths, flags.noDefaults)
 	if err != nil {
 		return err
+	}
+	for _, s := range srcs {
+		debug.Log("source: label=%q origin=%s root=%s maxDepth=%d agents=%v", s.Label, s.Origin, s.Root, s.MaxDepth, s.Agents)
 	}
 
 	noColor := flags.noColor || os.Getenv("NO_COLOR") != ""

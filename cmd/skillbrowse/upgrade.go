@@ -11,6 +11,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/dchancogne/skillbrowse/internal/buildinfo"
+	"github.com/dchancogne/skillbrowse/internal/debug"
 	"github.com/dchancogne/skillbrowse/internal/update"
 )
 
@@ -39,10 +40,13 @@ func runUpgrade(cmd *cobra.Command, checkOnly, assumeYes bool) error {
 	ctx := context.Background()
 
 	client := update.NewClient()
+	debug.Log("upgrade: checking %s/%s for a release newer than %s", client.Owner, client.Repo, buildinfo.Version)
 	check, err := update.CheckForUpdate(ctx, client, buildinfo.Version)
 	if err != nil {
+		debug.Log("upgrade: check failed: %s", err)
 		return err
 	}
+	debug.Log("upgrade: latest=%s available=%t asset=%s", check.Latest, check.UpdateAvailable, check.Asset.Name)
 
 	if !check.UpdateAvailable {
 		_, err := fmt.Fprintf(out, "skillbrowse %s is up to date.\n", check.Current)
@@ -76,8 +80,10 @@ func runUpgrade(cmd *cobra.Command, checkOnly, assumeYes bool) error {
 
 	opts := update.Options{Client: client, Verifier: update.DefaultVerifier()}
 	if err := update.Apply(ctx, opts, check); err != nil {
+		debug.Log("upgrade: apply failed: %s", err)
 		return err
 	}
+	debug.Log("upgrade: apply succeeded")
 
 	_, err = fmt.Fprintf(out, "Updated to %s. Restart skillbrowse to use it.\n", check.Latest)
 	return err
