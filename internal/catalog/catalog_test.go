@@ -169,12 +169,15 @@ func TestBuild_PreservesModifiedAtAndContent(t *testing.T) {
 	when := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
 	candidates := []discovery.Candidate{candidate("A", []string{"A"}, "/skills/a", "/a")}
 	parse := fakeParse(map[string]skill.Parsed{
-		"/skills/a": {Name: "A", Content: "body", ModifiedAt: when},
+		"/skills/a": {Name: "A", Content: "---\nname: A\n---\nbody", Body: "body", ModifiedAt: when},
 	})
 
 	cat := Build(candidates, parse)
-	if cat.Skills[0].Content != "body" {
+	if cat.Skills[0].Content != "---\nname: A\n---\nbody" {
 		t.Errorf("Content = %q", cat.Skills[0].Content)
+	}
+	if cat.Skills[0].Body != "body" {
+		t.Errorf("Body = %q, want %q", cat.Skills[0].Body, "body")
 	}
 	if !cat.Skills[0].ModifiedAt.Equal(when) {
 		t.Errorf("ModifiedAt = %v, want %v", cat.Skills[0].ModifiedAt, when)

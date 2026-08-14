@@ -33,7 +33,8 @@ type Parsed struct {
 	Name        string
 	Description string
 	Version     string // optional; "" when the front matter has no version field
-	Content     string
+	Content     string // full raw file, including front matter, for the raw-view toggle
+	Body        string // Content with any leading YAML front matter block removed, for Markdown rendering
 	ModifiedAt  time.Time
 	Oversized   bool
 	Diagnostics []string
@@ -110,6 +111,7 @@ func Parse(canonicalPath, skillFilePath string) Parsed {
 		Description: description,
 		Version:     version,
 		Content:     content,
+		Body:        strings.TrimLeft(body, "\n"),
 		ModifiedAt:  info.ModTime(),
 		Diagnostics: diagnostics,
 	}
@@ -124,6 +126,11 @@ type frontMatter struct {
 // extractFrontMatter splits a leading "---" ... "---" YAML block from the
 // rest of the document. hasFrontMatter is false when the content doesn't
 // begin with a front-matter delimiter at all (not itself an error).
+//
+// body is returned as a substring slice of content (not rebuilt via
+// strings.Join), so it shares content's backing array rather than
+// doubling memory per skill — material at catalog scale (NFR-04 budgets
+// 10,000 skills under 100 MiB).
 func extractFrontMatter(content string) (fm frontMatter, body string, hasFrontMatter bool, err error) {
 	lines := strings.Split(content, "\n")
 	if len(lines) == 0 || strings.TrimRight(lines[0], "\r") != frontMatterDelim {
@@ -141,8 +148,17 @@ func extractFrontMatter(content string) (fm frontMatter, body string, hasFrontMa
 		return frontMatter{}, content, true, fmt.Errorf("no closing %q delimiter found", frontMatterDelim)
 	}
 
+	// Byte offset of the first line after the closing delimiter: the sum
+	// of every line's length plus its newline, up to and including that
+	// delimiter line.
+	bodyStart := 0
+	for _, l := range lines[:closeIdx+1] {
+		bodyStart += len(l) + 1
+	}
+	bodyStart = min(bodyStart, len(content))
+
 	yamlBlock := strings.Join(lines[1:closeIdx], "\n")
-	body = strings.Join(lines[closeIdx+1:], "\n")
+	body = content[bodyStart:]
 
 	var raw frontMatter
 	if err := yaml.Unmarshal([]byte(yamlBlock), &raw); err != nil {

@@ -35,6 +35,28 @@ func TestParse_FrontMatterNameAndDescription(t *testing.T) {
 	}
 }
 
+func TestParse_BodyStripsFrontMatter(t *testing.T) {
+	dir, path := writeSkill(t, "---\nname: My Skill\ndescription: Does the thing.\n---\n## Heading\n\nBody text.\n")
+	p := Parse(dir, path)
+	if strings.Contains(p.Body, "name: My Skill") || strings.Contains(p.Body, "---") {
+		t.Errorf("Body still contains front matter: %q", p.Body)
+	}
+	if !strings.Contains(p.Body, "## Heading") || !strings.Contains(p.Body, "Body text.") {
+		t.Errorf("Body missing expected content: %q", p.Body)
+	}
+	if !strings.HasPrefix(p.Content, "---\nname: My Skill") {
+		t.Errorf("Content should retain the raw front matter for the raw view, got %q", p.Content)
+	}
+}
+
+func TestParse_BodyWithoutFrontMatterEqualsContent(t *testing.T) {
+	dir, path := writeSkill(t, "## Heading\n\nBody text.\n")
+	p := Parse(dir, path)
+	if p.Body != p.Content {
+		t.Errorf("Body = %q, want equal to Content %q", p.Body, p.Content)
+	}
+}
+
 func TestParse_Version(t *testing.T) {
 	dir, path := writeSkill(t, "---\nname: My Skill\nversion: 1.2.3\n---\nBody.\n")
 	p := Parse(dir, path)

@@ -427,9 +427,9 @@ func (m *Model) refreshDetailContent() {
 			body = "(content not available)"
 		}
 	default:
-		rendered, err := m.mdCache.Render(s.Content, m.viewport.Width(), m.dark, m.noColor)
+		rendered, err := m.mdCache.Render(s.Body, m.viewport.Width(), m.dark, m.noColor)
 		if err != nil {
-			body = s.Content
+			body = s.Body
 		} else {
 			body = rendered
 		}
@@ -438,11 +438,16 @@ func (m *Model) refreshDetailContent() {
 	m.viewport.SetContent(header + "\n" + body)
 }
 
+// headerBoxOverhead is how many columns metadataBoxStyle adds beyond its
+// content width: 2 for MarginLeft (the indent), 2 for the border's left
+// and right edges, 2 for Padding's left and right cells.
+const headerBoxOverhead = 6
+
 func (m *Model) renderHeader(s catalog.Skill) string {
 	var b strings.Builder
 
-	fmt.Fprintf(&b, "%s\n", m.style(s.Name, headerNameStyle))
-	fmt.Fprintf(&b, "%s\n\n", m.style(s.Description, headerDescStyle))
+	fmt.Fprintf(&b, "%s %s\n", m.style("Name:", sectionStyle), m.style(s.Name, headerNameStyle))
+	fmt.Fprintf(&b, "%s %s\n\n", m.style("Description:", sectionStyle), m.style(s.Description, headerDescStyle))
 
 	fmt.Fprintf(&b, "%s %s\n", m.style("Agents:", sectionStyle), strings.Join(s.Agents, ", "))
 	fmt.Fprintf(&b, "%s %s\n", m.style("Sources:", sectionStyle), strings.Join(s.SourceLabels, ", "))
@@ -461,7 +466,18 @@ func (m *Model) renderHeader(s catalog.Skill) string {
 		}
 	}
 
-	return b.String()
+	// Indented, bordered box so the metadata reads as a distinct block
+	// from the skill's own (Markdown-rendered) body below it; Width makes
+	// long fields like Description wrap instead of overflowing.
+	innerWidth := m.viewport.Width() - headerBoxOverhead
+	if innerWidth < 20 {
+		innerWidth = 20
+	}
+	box := metadataBoxStyle
+	if m.noColor {
+		box = metadataBoxStyleNoColor
+	}
+	return box.Width(innerWidth).Render(b.String())
 }
 
 // renderDiagnostics is the "diagnostics view" design doc §9 pairs with

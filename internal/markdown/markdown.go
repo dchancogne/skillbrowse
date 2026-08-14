@@ -10,17 +10,25 @@ import (
 	"sync"
 
 	"charm.land/glamour/v2"
+	"charm.land/glamour/v2/ansi"
+	"charm.land/glamour/v2/styles"
 )
 
 // Render sanitizes content and renders it as Markdown at the given
-// terminal width. noColor selects Glamour's "notty" style, which emits no
-// ANSI codes at all (honoring NO_COLOR/--no-color); otherwise dark or
-// light selects between Glamour's standard dark/light styles.
+// terminal width. noColor uses Glamour's stock "notty" style, which
+// emits no ANSI codes at all (honoring NO_COLOR/--no-color) and so must
+// keep "#"-prefixed headings as the only way to convey heading level in
+// plain text; otherwise dark or light selects a heading-decluttered
+// variant of Glamour's standard dark/light styles (see headingStyle).
 func Render(content string, width int, dark, noColor bool) (string, error) {
-	r, err := glamour.NewTermRenderer(
-		glamour.WithStandardStyle(styleName(dark, noColor)),
-		glamour.WithWordWrap(width),
-	)
+	var opt glamour.TermRendererOption
+	if noColor {
+		opt = glamour.WithStandardStyle("notty")
+	} else {
+		opt = glamour.WithStyles(headingStyle(dark))
+	}
+
+	r, err := glamour.NewTermRenderer(opt, glamour.WithWordWrap(width))
 	if err != nil {
 		return "", err
 	}
@@ -28,16 +36,45 @@ func Render(content string, width int, dark, noColor bool) (string, error) {
 	return r.Render(sanitize(content))
 }
 
-func styleName(dark, noColor bool) string {
-	switch {
-	case noColor:
-		return "notty"
-	case dark:
-		return "dark"
-	default:
-		return "light"
+// headingStyle returns Glamour's standard dark/light style with the H2-H6
+// "##"-style literal prefixes removed. Glamour's stock styles keep those
+// markers even in color mode (only H1 gets a distinct badge treatment),
+// which reads as unrendered Markdown in a terminal that already shows
+// color; here heading level is conveyed by color/weight instead, same as
+// H1's badge already does.
+func headingStyle(dark bool) ansi.StyleConfig {
+	cfg := styles.LightStyleConfig
+	if dark {
+		cfg = styles.DarkStyleConfig
 	}
+
+	h2Color, h3Color := "39", "35" // dark: cyan, teal
+	if !dark {
+		h2Color, h3Color = "27", "25" // light: darker blue shades
+	}
+
+	cfg.H2.Prefix = ""
+	cfg.H2.Bold = boolPtr(true)
+	cfg.H2.Color = stringPtr(h2Color)
+
+	cfg.H3.Prefix = ""
+	cfg.H3.Bold = boolPtr(true)
+	cfg.H3.Color = stringPtr(h3Color)
+
+	cfg.H4.Prefix = ""
+	cfg.H4.Bold = boolPtr(true)
+
+	cfg.H5.Prefix = ""
+	cfg.H5.Italic = boolPtr(true)
+
+	cfg.H6.Prefix = ""
+	cfg.H6.Italic = boolPtr(true)
+
+	return cfg
 }
+
+func stringPtr(s string) *string { return &s }
+func boolPtr(b bool) *bool       { return &b }
 
 // sanitize strips control characters that could manipulate the terminal
 // (cursor movement, screen clears, hidden escape sequences) while

@@ -28,7 +28,8 @@ type Skill struct {
 	Agents        []string
 	SourceLabels  []string
 	ModifiedAt    time.Time
-	Content       string
+	Content       string // full raw SKILL.md file, for the raw-view toggle
+	Body          string // Content with front matter stripped, for Markdown rendering
 	Diagnostics   []string
 }
 
@@ -76,6 +77,7 @@ func Build(candidates []discovery.Candidate, parse ParseFunc) Catalog {
 			SourceLabels:  sortedUnique(labels),
 			ModifiedAt:    parsed.ModifiedAt,
 			Content:       parsed.Content,
+			Body:          parsed.Body,
 			Diagnostics:   parsed.Diagnostics,
 		})
 	}

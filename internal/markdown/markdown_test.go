@@ -15,6 +15,31 @@ func TestRender_BasicMarkdown(t *testing.T) {
 	}
 }
 
+func TestRender_SubheadingsDropLiteralHashPrefixInColor(t *testing.T) {
+	for _, dark := range []bool{true, false} {
+		out, err := Render("## Subheading\n\nBody.\n", 80, dark, false)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if strings.Contains(out, "##") {
+			t.Errorf("dark=%v: expected no literal '##' in colored output, got %q", dark, out)
+		}
+		if !strings.Contains(out, "Subheading") {
+			t.Errorf("dark=%v: expected heading text preserved, got %q", dark, out)
+		}
+	}
+}
+
+func TestRender_NoColorKeepsHashPrefixForSubheadings(t *testing.T) {
+	out, err := Render("## Subheading\n\nBody.\n", 80, true, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(out, "## Subheading") {
+		t.Errorf("expected literal '## ' prefix preserved with no color (only way to convey heading level as plain text), got %q", out)
+	}
+}
+
 func TestRender_NoColorProducesNoANSI(t *testing.T) {
 	out, err := Render("# Title\n\n**bold** text.\n", 80, true, true)
 	if err != nil {
