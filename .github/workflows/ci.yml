@@ -45,7 +45,7 @@ jobs:
       - uses: actions/setup-go@v5
         with:
           go-version-file: go.mod
-      - uses: golangci/golangci-lint-action@v6
+      - uses: golangci/golangci-lint-action@v7
         with:
           # `latest` resolved to a v1.x binary built with Go 1.24, which
           # refuses to run against this module's `go 1.26.5` directive.
