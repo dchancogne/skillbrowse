@@ -40,6 +40,43 @@ func TestRender_NoColorKeepsHashPrefixForSubheadings(t *testing.T) {
 	}
 }
 
+func TestRender_FencedCodeBlockGetsABorderedBox(t *testing.T) {
+	content := "Intro.\n\n```go\nfunc main() {}\n```\n\nOutro.\n"
+	out, err := Render(content, 60, true, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(out, "┌") || !strings.Contains(out, "└") {
+		t.Errorf("expected a border box around the code block, got %q", out)
+	}
+	if !strings.Contains(out, "main") {
+		t.Errorf("expected code content preserved, got %q", out)
+	}
+	if strings.Contains(out, "```") {
+		t.Errorf("expected fence markers consumed by rendering, got %q", out)
+	}
+	if strings.Contains(out, "CODEBLOCK") {
+		t.Errorf("expected no leaked sentinel placeholder, got %q", out)
+	}
+	if !strings.Contains(out, "Intro.") || !strings.Contains(out, "Outro.") {
+		t.Errorf("expected surrounding prose preserved, got %q", out)
+	}
+}
+
+func TestRender_MultipleCodeBlocksEachGetOwnBox(t *testing.T) {
+	content := "```go\nfirst\n```\n\ntext\n\n```python\nsecond\n```\n"
+	out, err := Render(content, 60, true, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(out, "first") || !strings.Contains(out, "second") {
+		t.Errorf("expected both code blocks preserved, got %q", out)
+	}
+	if strings.Count(out, "┌") != 2 {
+		t.Errorf("expected 2 boxes, got %d in %q", strings.Count(out, "┌"), out)
+	}
+}
+
 func TestRender_NoColorProducesNoANSI(t *testing.T) {
 	out, err := Render("# Title\n\n**bold** text.\n", 80, true, true)
 	if err != nil {
