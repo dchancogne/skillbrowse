@@ -53,9 +53,16 @@ jobs:
           - os: ubuntu-latest
             goos: linux
             goarch: amd64
-          - os: macos-13 # Intel runner
-            goos: darwin
-            goarch: amd64
+          # No darwin/amd64 (Intel) leg: GitHub's free-tier "macos-13"
+          # hosted runner image has run out of capacity (observed: a
+          # v0.2.0 release run sat queued on it for 6+ hours with no
+          # runner ever assigned) as part of GitHub's broader move to
+          # Apple Silicon hosted runners. macos-13-large exists but is a
+          # paid SKU even for public repos, so it isn't a drop-in
+          # replacement without an explicit decision to pay for it.
+          # darwin/amd64 build correctness is still covered by
+          # ci.yml's cross-compile matrix; only the execute-the-real-
+          # binary smoke test is lost here.
           - os: macos-14 # Apple Silicon runner
             goos: darwin
             goarch: arm64

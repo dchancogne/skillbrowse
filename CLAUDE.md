@@ -50,7 +50,7 @@ internal/benchfixture synthetic skill-tree generator for performance tests/bench
 tools/checksum-signer release-workflow helper: signs checksums.txt with the Ed25519 key (never run by end users)
 ```
 
-Release infrastructure: `.goreleaser.yaml` (build/archive/checksum/sign/SBOM config), `.github/workflows/ci.yml` (lint/test/vuln/build-matrix on every push/PR), `.github/workflows/release.yml` (on `vX.Y.Z` tag: build, sign, publish, then smoke-test the published archives on real macOS Intel/Apple-Silicon and Linux amd64 runners, plus linux/arm64 under QEMU), `install.sh` (checksum-verified install script).
+Release infrastructure: `.goreleaser.yaml` (build/archive/checksum/sign/SBOM config), `.github/workflows/ci.yml` (lint/test/vuln/build-matrix on every push/PR), `.github/workflows/release.yml` (on `vX.Y.Z` tag: build, sign, publish, then smoke-test the published archives on real macOS Apple-Silicon and Linux amd64 runners, plus linux/arm64 under QEMU — no darwin/amd64 leg, since GitHub's free `macos-13` Intel runner image ran out of capacity, see the workflow's comment), `install.sh` (checksum-verified install script).
 
 Data flow: built-in registry + validated custom sources → discovery scanner → metadata parser → catalog normalizer → immutable catalog snapshot → Bubble Tea UI (rescan loops back to the scanner; explicit update requests go to the updater → GitHub Releases).
 
