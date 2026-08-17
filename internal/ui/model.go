@@ -339,6 +339,7 @@ func (m *Model) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		switch k {
 		case "esc":
 			m.focus = focusList
+			m.applySizes()
 			return m, nil
 		default:
 			var cmd tea.Cmd
@@ -351,7 +352,7 @@ func (m *Model) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	case "enter":
 		if m.selectedSkill() != nil {
 			m.focus = focusDetail
-			m.refreshDetailContent()
+			m.applySizes()
 		}
 		return m, nil
 	}
@@ -391,7 +392,13 @@ func (m *Model) applySizes() {
 		m.viewport.SetWidth(paneWidth)
 		m.viewport.SetHeight(paneHeight)
 	} else {
+		// The list pane gets more room while navigating (nothing useful to
+		// show in the detail pane yet) and shrinks back to its normal share
+		// once a skill is opened, so the detail pane can use the space.
 		listWidth := m.width / 3
+		if m.focus == focusList {
+			listWidth = m.width * 3 / 5
+		}
 		if listWidth < 24 {
 			listWidth = 24
 		}
