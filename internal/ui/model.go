@@ -357,8 +357,25 @@ func (m *Model) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		return m, nil
 	}
 
+	prevID := ""
+	if s := m.selectedSkill(); s != nil {
+		prevID = s.ID
+	}
+
 	var cmd tea.Cmd
 	m.list, cmd = m.list.Update(msg)
+
+	newID := ""
+	if s := m.selectedSkill(); s != nil {
+		newID = s.ID
+	}
+	if newID != prevID {
+		// Moving to a different skill while browsing the list should always
+		// present its detail pane from the top, not wherever the previous
+		// skill happened to be scrolled to.
+		m.viewport.GotoTop()
+	}
+
 	m.refreshDetailContent()
 	return m, cmd
 }
