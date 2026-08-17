@@ -339,6 +339,7 @@ func (m *Model) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		switch k {
 		case "esc":
 			m.focus = focusList
+			m.applySizes()
 			return m, nil
 		default:
 			var cmd tea.Cmd
@@ -351,13 +352,30 @@ func (m *Model) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	case "enter":
 		if m.selectedSkill() != nil {
 			m.focus = focusDetail
-			m.refreshDetailContent()
+			m.applySizes()
 		}
 		return m, nil
 	}
 
+	prevID := ""
+	if s := m.selectedSkill(); s != nil {
+		prevID = s.ID
+	}
+
 	var cmd tea.Cmd
 	m.list, cmd = m.list.Update(msg)
+
+	newID := ""
+	if s := m.selectedSkill(); s != nil {
+		newID = s.ID
+	}
+	if newID != prevID {
+		// Moving to a different skill while browsing the list should always
+		// present its detail pane from the top, not wherever the previous
+		// skill happened to be scrolled to.
+		m.viewport.GotoTop()
+	}
+
 	m.refreshDetailContent()
 	return m, cmd
 }
@@ -373,12 +391,31 @@ func (m *Model) applySizes() {
 		contentHeight = 1
 	}
 
+	// Each pane is framed by a focus-indicating border (renderPane), which
+	// consumes paneBorderOverhead columns/rows beyond the pane's own
+	// content; shrink the content size here so the bordered pane still
+	// fits the layout exactly.
+	paneHeight := contentHeight - paneBorderOverhead
+	if paneHeight < 1 {
+		paneHeight = 1
+	}
+
 	if m.narrow {
-		m.list.SetSize(m.width, contentHeight)
-		m.viewport.SetWidth(m.width)
-		m.viewport.SetHeight(contentHeight)
+		paneWidth := m.width - paneBorderOverhead
+		if paneWidth < 1 {
+			paneWidth = 1
+		}
+		m.list.SetSize(paneWidth, paneHeight)
+		m.viewport.SetWidth(paneWidth)
+		m.viewport.SetHeight(paneHeight)
 	} else {
+		// The list pane gets more room while navigating (nothing useful to
+		// show in the detail pane yet) and shrinks back to its normal share
+		// once a skill is opened, so the detail pane can use the space.
 		listWidth := m.width / 3
+		if m.focus == focusList {
+			listWidth = m.width * 3 / 5
+		}
 		if listWidth < 24 {
 			listWidth = 24
 		}
@@ -386,9 +423,17 @@ func (m *Model) applySizes() {
 		if detailWidth < 1 {
 			detailWidth = 1
 		}
-		m.list.SetSize(listWidth, contentHeight)
-		m.viewport.SetWidth(detailWidth)
-		m.viewport.SetHeight(contentHeight)
+		listPaneWidth := listWidth - paneBorderOverhead
+		if listPaneWidth < 1 {
+			listPaneWidth = 1
+		}
+		detailPaneWidth := detailWidth - paneBorderOverhead
+		if detailPaneWidth < 1 {
+			detailPaneWidth = 1
+		}
+		m.list.SetSize(listPaneWidth, paneHeight)
+		m.viewport.SetWidth(detailPaneWidth)
+		m.viewport.SetHeight(paneHeight)
 	}
 
 	m.refreshDetailContent()
@@ -500,6 +545,24 @@ func (m *Model) renderDiagnostics() string {
 	return b.String()
 }
 
+// renderPane frames a pane's rendered content with a border, distinguishing
+// the pane that currently receives keyboard input (active) from the one
+// that doesn't, so focus is visible rather than inferred.
+func (m *Model) renderPane(content string, active bool) string {
+	var style lipgloss.Style
+	switch {
+	case active && m.noColor:
+		style = activePaneStyleNoColor
+	case active:
+		style = activePaneStyle
+	case m.noColor:
+		style = inactivePaneStyleNoColor
+	default:
+		style = inactivePaneStyle
+	}
+	return style.Render(content)
+}
+
 func (m *Model) style(s string, style lipgloss.Style) string {
 	if m.noColor {
 		return s
@@ -593,12 +656,14 @@ func (m *Model) View() tea.View {
 	var body string
 	if m.narrow {
 		if m.focus == focusDetail {
-			body = m.viewport.View()
+			body = m.renderPane(m.viewport.View(), true)
 		} else {
-			body = m.list.View()
+			body = m.renderPane(m.list.View(), true)
 		}
 	} else {
-		body = lipgloss.JoinHorizontal(lipgloss.Top, m.list.View(), m.viewport.View())
+		listPane := m.renderPane(m.list.View(), m.focus == focusList)
+		detailPane := m.renderPane(m.viewport.View(), m.focus == focusDetail)
+		body = lipgloss.JoinHorizontal(lipgloss.Top, listPane, detailPane)
 	}
 
 	v := tea.NewView(lipgloss.JoinVertical(lipgloss.Left, body, m.renderFooter()))

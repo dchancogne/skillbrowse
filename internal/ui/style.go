@@ -48,4 +48,32 @@ var (
 	helpBoxStyleNoColor = lipgloss.NewStyle().
 				Border(lipgloss.RoundedBorder()).
 				Padding(1, 2)
+
+	// activePaneStyle frames whichever pane (list or detail) currently
+	// receives keyboard input, so focus is visible at a glance rather than
+	// inferred from where the cursor last was.
+	activePaneStyle = lipgloss.NewStyle().
+			Border(lipgloss.RoundedBorder()).
+			BorderForeground(lipgloss.Color("6"))
+
+	// inactivePaneStyle frames the pane that isn't receiving input, using
+	// the same dim border color as the rest of the UI's boxes so the active
+	// pane's brighter border reads as the sole highlight.
+	inactivePaneStyle = lipgloss.NewStyle().
+				Border(lipgloss.RoundedBorder()).
+				BorderForeground(lipgloss.Color("240"))
+
+	// activePaneStyleNoColor and inactivePaneStyleNoColor differentiate
+	// focus without relying on color (--no-color/NO_COLOR): the active pane
+	// gets a heavier border weight instead of a brighter color.
+	activePaneStyleNoColor = lipgloss.NewStyle().
+				Border(lipgloss.ThickBorder())
+
+	inactivePaneStyleNoColor = lipgloss.NewStyle().
+					Border(lipgloss.RoundedBorder())
 )
+
+// paneBorderOverhead is how many columns/rows a pane's border style adds
+// beyond its content size: 1 on each side for the top/bottom/left/right
+// border edges.
+const paneBorderOverhead = 2
