@@ -10,7 +10,6 @@ import (
 	"strings"
 	"time"
 
-	"charm.land/bubbles/v2/help"
 	"charm.land/bubbles/v2/list"
 	"charm.land/bubbles/v2/spinner"
 	"charm.land/bubbles/v2/viewport"
@@ -55,7 +54,6 @@ type Model struct {
 	list     list.Model
 	viewport viewport.Model
 	spinner  spinner.Model
-	help     help.Model
 	keys     appKeyMap
 	mdCache  *markdown.Cache
 
@@ -105,7 +103,6 @@ func New(srcs []sources.Source, opts ...Option) *Model {
 		sourceCount:    len(srcs),
 		mdCache:        markdown.NewCache(),
 		keys:           newAppKeyMap(),
-		help:           help.New(),
 		spinner:        spinner.New(spinner.WithSpinner(spinner.Line)),
 		currentVersion: "dev",
 		updateClient:   update.NewClient(),
@@ -394,7 +391,6 @@ func (m *Model) applySizes() {
 		m.viewport.SetHeight(contentHeight)
 	}
 
-	m.help.SetWidth(m.width)
 	m.refreshDetailContent()
 }
 
@@ -511,6 +507,58 @@ func (m *Model) style(s string, style lipgloss.Style) string {
 	return style.Render(s)
 }
 
+// renderHelp draws the full "?" keybinding overlay (design doc §3.6) as a
+// bordered box centered on screen. It lays out every binding from
+// m.keys.FullHelp() as its own key/description row rather than handing off
+// to the bubbles help component's side-by-side column layout: that layout
+// is all-or-nothing about which columns fit the available width, so on a
+// merely medium-width terminal it either overflowed the screen (the report
+// that motivated this) or silently dropped every column but the first.
+func (m *Model) renderHelp() string {
+	groups := m.keys.FullHelp()
+
+	keyWidth := 0
+	for _, g := range groups {
+		for _, kb := range g {
+			if w := lipgloss.Width(kb.Help().Key); w > keyWidth {
+				keyWidth = w
+			}
+		}
+	}
+
+	var b strings.Builder
+	b.WriteString(m.style("Keyboard shortcuts", helpTitleStyle))
+	b.WriteString("\n")
+	for _, g := range groups {
+		b.WriteString("\n")
+		for _, kb := range g {
+			b.WriteString(m.style(padKey(kb.Help().Key, keyWidth), helpKeyStyle))
+			b.WriteString("  ")
+			b.WriteString(kb.Help().Desc)
+			b.WriteString("\n")
+		}
+	}
+	body := strings.TrimRight(b.String(), "\n") + m.renderDiagnostics()
+
+	box := helpBoxStyle
+	if m.noColor {
+		box = helpBoxStyleNoColor
+	}
+	panel := box.Render(body)
+
+	return lipgloss.Place(m.width, m.height, lipgloss.Center, lipgloss.Center, panel)
+}
+
+// padKey right-pads a key label to align description columns, measuring
+// display width rather than byte length so multi-byte glyphs (the arrow
+// keys) still line up.
+func padKey(k string, width int) string {
+	if pad := width - lipgloss.Width(k); pad > 0 {
+		return k + strings.Repeat(" ", pad)
+	}
+	return k
+}
+
 func (m *Model) renderFooter() string {
 	parts := []string{
 		fmt.Sprintf("%d skills", m.totalSkills),
@@ -537,7 +585,7 @@ func (m *Model) View() tea.View {
 		))
 	}
 	if m.showHelp {
-		v := tea.NewView(m.help.View(m.keys) + m.renderDiagnostics())
+		v := tea.NewView(m.renderHelp())
 		v.AltScreen = true
 		return v
 	}

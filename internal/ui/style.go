@@ -27,4 +27,25 @@ var (
 				Border(lipgloss.RoundedBorder()).
 				Padding(0, 1).
 				MarginLeft(2)
+
+	// helpTitleStyle labels the "?" help overlay's box.
+	helpTitleStyle = lipgloss.NewStyle().Bold(true)
+
+	// helpKeyStyle sets off each binding's key label from its description
+	// in the "?" help overlay.
+	helpKeyStyle = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("6"))
+
+	// helpBoxStyle frames the full keybinding list shown by the "?"
+	// overlay, so it reads as a distinct panel rather than a stray line of
+	// text pinned to the corner of the screen.
+	helpBoxStyle = lipgloss.NewStyle().
+			Border(lipgloss.RoundedBorder()).
+			BorderForeground(lipgloss.Color("240")).
+			Padding(1, 2)
+
+	// helpBoxStyleNoColor mirrors helpBoxStyle without ANSI color, matching
+	// how m.style strips all styling under --no-color/NO_COLOR.
+	helpBoxStyleNoColor = lipgloss.NewStyle().
+				Border(lipgloss.RoundedBorder()).
+				Padding(1, 2)
 )
