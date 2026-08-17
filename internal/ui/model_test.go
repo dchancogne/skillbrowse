@@ -110,20 +110,41 @@ func drain(m *Model, cmd tea.Cmd) {
 	m.Update(msg)
 }
 
-func TestModel_ListShowsVersionPathAgentsAndSource(t *testing.T) {
+func TestModel_ListShowsVersionPathAndAgents(t *testing.T) {
 	root := t.TempDir()
 	writeSkill(t, filepath.Join(root, "alpha"), "---\nname: Alpha\ndescription: First skill.\nversion: 1.2.3\n---\nBody.\n")
 	srcs := []sources.Source{{Label: "My Source", Agents: []string{"Claude Code"}, Root: root, MaxDepth: 1}}
 
-	// Wide enough that the list pane doesn't truncate before "Source:
-	// My Source" and the tail of the (deep, OS-temp-dir-based) path.
+	// Wide enough that the list pane doesn't truncate before the tail of
+	// the (deep, OS-temp-dir-based) path.
 	m := newTestModel(t, 400, 40, srcs)
 	view := stripANSI(m.View().Content)
 
-	for _, want := range []string{"Alpha", "v1.2.3", "First skill.", "Agents: Claude Code", "Source: My Source", "alpha"} {
+	for _, want := range []string{"Alpha", "v1.2.3", "First skill.", "Agents: Claude Code", "alpha"} {
 		if !strings.Contains(view, want) {
 			t.Errorf("view missing %q: %q", want, view)
 		}
+	}
+}
+
+func TestModel_DetailHeaderSourcesListsObservedPaths(t *testing.T) {
+	root := t.TempDir()
+	writeSkill(t, filepath.Join(root, "alpha"), "---\nname: Alpha\ndescription: First skill.\n---\nBody.\n")
+	srcs := []sources.Source{{Label: "My Source", Agents: []string{"Claude Code"}, Root: root, MaxDepth: 1}}
+
+	m := newTestModel(t, 400, 40, srcs)
+	view := stripANSI(m.View().Content)
+
+	// "Sources:" now heads the discovered filesystem locations, not a
+	// second, usually-redundant copy of the Agents list.
+	if !strings.Contains(view, "Sources:") {
+		t.Errorf("view missing \"Sources:\" heading: %q", view)
+	}
+	if strings.Contains(view, "Source: My Source") {
+		t.Errorf("expected no redundant \"Source: <label>\" line, got: %q", view)
+	}
+	if !strings.Contains(view, filepath.Join(root, "alpha")) {
+		t.Errorf("view missing observed path under Sources: %q", view)
 	}
 }
 

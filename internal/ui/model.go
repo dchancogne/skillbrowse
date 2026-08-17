@@ -450,9 +450,15 @@ func (m *Model) renderHeader(s catalog.Skill) string {
 	fmt.Fprintf(&b, "%s %s\n\n", m.style("Description:", sectionStyle), m.style(s.Description, headerDescStyle))
 
 	fmt.Fprintf(&b, "%s %s\n", m.style("Agents:", sectionStyle), strings.Join(s.Agents, ", "))
-	fmt.Fprintf(&b, "%s %s\n", m.style("Sources:", sectionStyle), strings.Join(s.SourceLabels, ", "))
-	for _, p := range s.ObservedPaths {
-		fmt.Fprintf(&b, "  %s\n", shortenPath(p, m.home))
+	if len(s.ObservedPaths) > 0 {
+		// "Sources:" now heads the actual discovered filesystem locations
+		// rather than duplicating Agents with a parallel list of source
+		// labels (which, for every built-in source, is identical to
+		// Agents anyway - see internal/sources.Registry).
+		b.WriteString(m.style("Sources:", sectionStyle) + "\n")
+		for _, p := range s.ObservedPaths {
+			fmt.Fprintf(&b, "  %s\n", shortenPath(p, m.home))
+		}
 	}
 	fmt.Fprintf(&b, "%s %s\n", m.style("Path:", sectionStyle), shortenPath(s.CanonicalPath, m.home))
 	if !s.ModifiedAt.IsZero() {

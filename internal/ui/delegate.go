@@ -13,7 +13,6 @@ import (
 
 const (
 	maxAgentsShown = 5
-	maxLabelsShown = 3
 
 	// maxDescLines caps how many lines a list item's description wraps
 	// onto, so every item still contributes a fixed, predictable height
@@ -88,10 +87,12 @@ func (d skillDelegate) Render(w io.Writer, m list.Model, index int, item list.It
 	}
 	primary += "    " + path
 
-	secondary := fmt.Sprintf("Agents: %s    Source: %s",
-		joinWithMore(si.skill.Agents, maxAgentsShown),
-		joinWithMore(si.skill.SourceLabels, maxLabelsShown),
-	)
+	// Source labels aren't shown here: for every built-in source they're
+	// identical to Agents (see internal/sources.Registry), so a parallel
+	// "Source: ..." field was pure duplication in the common case; the
+	// detail header's "Sources:" section still surfaces the underlying
+	// discovered paths for the cases where it isn't (custom sources).
+	secondary := "Agents: " + joinWithMore(si.skill.Agents, maxAgentsShown)
 
 	primary = ansi.Truncate(primary, textWidth, "…")
 	secondary = ansi.Truncate(secondary, textWidth, "…")
