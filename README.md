@@ -6,10 +6,6 @@ A read-only, keyboard-first terminal application (macOS and Linux) for discoveri
 
 ![skillbrowse showing the skill list and a rendered SKILL.md detail pane](docs/images/screenshot.png)
 
-## Status
-
-Implementation is in progress, following the phased plan in [`docs/skillbrowse-implementation-plan.md`](docs/skillbrowse-implementation-plan.md). Phases 0–6 (scaffolding through the release pipeline) are complete; track detailed progress and current caveats in [`tasks/todo.md`](tasks/todo.md).
-
 ## Installing
 
 ```sh
