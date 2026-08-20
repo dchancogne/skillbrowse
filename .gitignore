@@ -1,4 +1,5 @@
 .superpowers/
+.worktree/
 /bin/
 /dist/
 
