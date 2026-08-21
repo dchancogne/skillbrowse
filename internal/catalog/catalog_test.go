@@ -64,6 +64,62 @@ func TestBuild_SameNameDifferentPathsStaySeparate(t *testing.T) {
 	if len(cat.Skills) != 2 {
 		t.Fatalf("expected 2 separate skills, got %d", len(cat.Skills))
 	}
+	for _, s := range cat.Skills {
+		if s.DuplicateNameCount != 1 {
+			t.Errorf("skill %q: DuplicateNameCount = %d, want 1", s.CanonicalPath, s.DuplicateNameCount)
+		}
+	}
+}
+
+func TestBuild_DuplicateNameIdenticalContentNotFlaggedAsDiverged(t *testing.T) {
+	candidates := []discovery.Candidate{
+		candidate("Claude Code", []string{"Claude Code"}, "/skills/a", "/claude/a"),
+		candidate("Cursor", []string{"Cursor"}, "/skills/b", "/cursor/b"),
+	}
+	parse := fakeParse(map[string]skill.Parsed{
+		"/skills/a": {Name: "Same Name", ContentHash: "hash1"},
+		"/skills/b": {Name: "Same Name", ContentHash: "hash1"},
+	})
+
+	cat := Build(candidates, parse)
+	for _, s := range cat.Skills {
+		if s.DuplicateContentDiffers {
+			t.Errorf("skill %q: DuplicateContentDiffers = true, want false for matching hashes", s.CanonicalPath)
+		}
+	}
+}
+
+func TestBuild_DuplicateNameDivergedContentFlagged(t *testing.T) {
+	candidates := []discovery.Candidate{
+		candidate("Claude Code", []string{"Claude Code"}, "/skills/a", "/claude/a"),
+		candidate("Cursor", []string{"Cursor"}, "/skills/b", "/cursor/b"),
+	}
+	parse := fakeParse(map[string]skill.Parsed{
+		"/skills/a": {Name: "Same Name", ContentHash: "hash1"},
+		"/skills/b": {Name: "Same Name", ContentHash: "hash2"},
+	})
+
+	cat := Build(candidates, parse)
+	for _, s := range cat.Skills {
+		if !s.DuplicateContentDiffers {
+			t.Errorf("skill %q: DuplicateContentDiffers = false, want true for differing hashes", s.CanonicalPath)
+		}
+	}
+}
+
+func TestBuild_NoDuplicateNameLeavesFieldsZero(t *testing.T) {
+	candidates := []discovery.Candidate{
+		candidate("Claude Code", []string{"Claude Code"}, "/skills/a", "/claude/a"),
+	}
+	parse := fakeParse(map[string]skill.Parsed{
+		"/skills/a": {Name: "Unique"},
+	})
+
+	cat := Build(candidates, parse)
+	s := cat.Skills[0]
+	if s.DuplicateNameCount != 0 || s.DuplicateContentDiffers {
+		t.Errorf("got DuplicateNameCount=%d DuplicateContentDiffers=%v, want zero values", s.DuplicateNameCount, s.DuplicateContentDiffers)
+	}
 }
 
 func TestBuild_ParsesEachCanonicalPathOnce(t *testing.T) {

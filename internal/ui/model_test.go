@@ -148,6 +148,60 @@ func TestModel_DetailHeaderSourcesListsObservedPaths(t *testing.T) {
 	}
 }
 
+func TestModel_DuplicateNameShowsDivergedIndicator(t *testing.T) {
+	rootA, rootB := t.TempDir(), t.TempDir()
+	writeSkill(t, filepath.Join(rootA, "dup"), "---\nname: Dup\ndescription: A.\n---\nBody A.\n")
+	writeSkill(t, filepath.Join(rootB, "dup"), "---\nname: Dup\ndescription: B.\n---\nBody B.\n")
+	srcs := []sources.Source{
+		{Label: "Claude Code", Agents: []string{"Claude Code"}, Root: rootA, MaxDepth: 1},
+		{Label: "Cursor", Agents: []string{"Cursor"}, Root: rootB, MaxDepth: 1},
+	}
+
+	m := newTestModel(t, 400, 40, srcs)
+	view := stripANSI(m.View().Content)
+
+	if !strings.Contains(view, "⚠ (diverges in 1 other places)") {
+		t.Errorf("list view missing diverged-duplicate badge: %q", view)
+	}
+	if !strings.Contains(view, "Same name elsewhere:") || !strings.Contains(view, "contents differ") {
+		t.Errorf("detail header missing diverged-duplicate line: %q", view)
+	}
+}
+
+func TestModel_DuplicateNameIdenticalContentShowsNoWarning(t *testing.T) {
+	rootA, rootB := t.TempDir(), t.TempDir()
+	const same = "---\nname: Dup\ndescription: Same.\n---\nSame body.\n"
+	writeSkill(t, filepath.Join(rootA, "dup"), same)
+	writeSkill(t, filepath.Join(rootB, "dup"), same)
+	srcs := []sources.Source{
+		{Label: "Claude Code", Agents: []string{"Claude Code"}, Root: rootA, MaxDepth: 1},
+		{Label: "Cursor", Agents: []string{"Cursor"}, Root: rootB, MaxDepth: 1},
+	}
+
+	m := newTestModel(t, 400, 40, srcs)
+	view := stripANSI(m.View().Content)
+
+	if !strings.Contains(view, "(identical in 1 other places)") {
+		t.Errorf("list view missing identical-duplicate badge: %q", view)
+	}
+	if strings.Contains(view, "⚠") {
+		t.Errorf("expected no diverged-content warning for identical bodies: %q", view)
+	}
+	if !strings.Contains(view, "Same name elsewhere:") || strings.Contains(view, "contents differ") {
+		t.Errorf("detail header should report identical, not diverged: %q", view)
+	}
+}
+
+func TestModel_NoDuplicateNameShowsNoIndicator(t *testing.T) {
+	srcs := twoSkillSources(t) // "Alpha" and "Beta" - distinct names
+	m := newTestModel(t, 400, 40, srcs)
+	view := stripANSI(m.View().Content)
+
+	if strings.Contains(view, "elsewhere") || strings.Contains(view, "Same name elsewhere:") {
+		t.Errorf("expected no duplicate-name indicator for distinct names: %q", view)
+	}
+}
+
 func TestModel_ScanPopulatesListAndFooterCounts(t *testing.T) {
 	srcs := twoSkillSources(t)
 	m := newTestModel(t, 120, 40, srcs)

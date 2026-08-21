@@ -30,7 +30,19 @@ type Skill struct {
 	ModifiedAt    time.Time
 	Content       string // full raw SKILL.md file, for the raw-view toggle
 	Body          string // Content with front matter stripped, for Markdown rendering
+	ContentHash   string
 	Diagnostics   []string
+
+	// DuplicateNameCount is how many other records (at different canonical
+	// paths) share this Skill's Name, case-insensitively. It is 0 unless a
+	// same-named skill exists at a genuinely separate path - per design
+	// doc §5.5, canonical-path duplicates already merge above this point,
+	// so this only fires on real, unrelated same-name collisions.
+	DuplicateNameCount int
+	// DuplicateContentDiffers is true when at least one same-named sibling
+	// has a different ContentHash, meaning the copies have diverged rather
+	// than being independently-placed copies of identical content.
+	DuplicateContentDiffers bool
 }
 
 // Catalog is an immutable snapshot of every discovered skill, sorted in
@@ -78,12 +90,43 @@ func Build(candidates []discovery.Candidate, parse ParseFunc) Catalog {
 			ModifiedAt:    parsed.ModifiedAt,
 			Content:       parsed.Content,
 			Body:          parsed.Body,
+			ContentHash:   parsed.ContentHash,
 			Diagnostics:   parsed.Diagnostics,
 		})
 	}
 
+	markNameCollisions(skills)
 	sortDefault(skills)
 	return Catalog{Skills: skills}
+}
+
+// markNameCollisions sets DuplicateNameCount and DuplicateContentDiffers on
+// every record that shares its Name (case-insensitively) with a record at a
+// different CanonicalPath. Canonical-path duplicates are already merged
+// into one record by Build, so this only detects genuinely separate
+// same-name installations - an advisory signal, not a merge: per design
+// doc §5.5, same-named skills at different paths remain distinct records.
+func markNameCollisions(skills []Skill) {
+	byName := make(map[string][]int, len(skills))
+	for i, s := range skills {
+		key := strings.ToLower(s.Name)
+		byName[key] = append(byName[key], i)
+	}
+
+	for _, idxs := range byName {
+		if len(idxs) < 2 {
+			continue
+		}
+		for _, i := range idxs {
+			skills[i].DuplicateNameCount = len(idxs) - 1
+			for _, j := range idxs {
+				if j != i && skills[j].ContentHash != skills[i].ContentHash {
+					skills[i].DuplicateContentDiffers = true
+					break
+				}
+			}
+		}
+	}
 }
 
 // BuildFromCandidates is Build using skill.Parse directly.
