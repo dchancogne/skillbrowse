@@ -502,6 +502,18 @@ func (m *Model) renderHeader(s catalog.Skill) string {
 		}
 	}
 	fmt.Fprintf(&b, "%s %s\n", m.style("Path:", sectionStyle), shortenPath(s.CanonicalPath, m.home))
+	if s.DuplicateNameCount > 0 {
+		state := "identical"
+		if s.DuplicateContentDiffers {
+			state = "contents differ"
+		}
+		copyWord := "copy"
+		if s.DuplicateNameCount > 1 {
+			copyWord = "copies"
+		}
+		fmt.Fprintf(&b, "%s %d other %s at unrelated paths (%s)\n",
+			m.style("Same name elsewhere:", sectionStyle), s.DuplicateNameCount, copyWord, state)
+	}
 	if !s.ModifiedAt.IsZero() {
 		fmt.Fprintf(&b, "%s %s\n", m.style("Modified:", sectionStyle), s.ModifiedAt.Format(time.RFC3339))
 	}

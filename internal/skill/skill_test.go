@@ -212,4 +212,34 @@ func TestParse_MissingFileProducesDiagnostic(t *testing.T) {
 	if p.Description != noDescription {
 		t.Errorf("Description = %q", p.Description)
 	}
+	if p.ContentHash != "" {
+		t.Errorf("ContentHash = %q, want empty for an unreadable file", p.ContentHash)
+	}
+}
+
+func TestParse_ContentHashMatchesForIdenticalBody(t *testing.T) {
+	dirA, pathA := writeSkill(t, "---\nname: Foo\n---\nSame body text.\n")
+	dirB, pathB := writeSkill(t, "---\nname: Foo\nversion: 2.0.0\n---\nSame body text.\n")
+
+	a := Parse(dirA, pathA)
+	b := Parse(dirB, pathB)
+
+	if a.ContentHash == "" || b.ContentHash == "" {
+		t.Fatalf("expected non-empty hashes, got %q and %q", a.ContentHash, b.ContentHash)
+	}
+	if a.ContentHash != b.ContentHash {
+		t.Errorf("ContentHash differs despite identical bodies: %q vs %q", a.ContentHash, b.ContentHash)
+	}
+}
+
+func TestParse_ContentHashDiffersForDifferentBody(t *testing.T) {
+	dirA, pathA := writeSkill(t, "---\nname: Foo\n---\nBody one.\n")
+	dirB, pathB := writeSkill(t, "---\nname: Foo\n---\nBody two.\n")
+
+	a := Parse(dirA, pathA)
+	b := Parse(dirB, pathB)
+
+	if a.ContentHash == b.ContentHash {
+		t.Errorf("ContentHash matches despite different bodies: %q", a.ContentHash)
+	}
 }

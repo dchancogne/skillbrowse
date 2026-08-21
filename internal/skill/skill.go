@@ -4,6 +4,8 @@
 package skill
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -35,6 +37,7 @@ type Parsed struct {
 	Version     string // optional; "" when the front matter has no version field
 	Content     string // full raw file, including front matter, for the raw-view toggle
 	Body        string // Content with any leading YAML front matter block removed, for Markdown rendering
+	ContentHash string // hash of Body, "" when Body couldn't be loaded; used to detect same-name collisions with diverged content
 	ModifiedAt  time.Time
 	Oversized   bool
 	Diagnostics []string
@@ -106,15 +109,26 @@ func Parse(canonicalPath, skillFilePath string) Parsed {
 		description = noDescription
 	}
 
+	trimmedBody := strings.TrimLeft(body, "\n")
+
 	return Parsed{
 		Name:        name,
 		Description: description,
 		Version:     version,
 		Content:     content,
-		Body:        strings.TrimLeft(body, "\n"),
+		Body:        trimmedBody,
+		ContentHash: contentHash(trimmedBody),
 		ModifiedAt:  info.ModTime(),
 		Diagnostics: diagnostics,
 	}
+}
+
+// contentHash returns a short, stable hash of body, used to tell whether
+// two same-named skills at different canonical paths share content or have
+// diverged.
+func contentHash(body string) string {
+	sum := sha256.Sum256([]byte(body))
+	return hex.EncodeToString(sum[:])[:16]
 }
 
 type frontMatter struct {

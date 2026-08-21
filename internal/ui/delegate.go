@@ -83,9 +83,16 @@ func (d skillDelegate) Render(w io.Writer, m list.Model, index int, item list.It
 	}
 	path := shortenPath(si.skill.CanonicalPath, si.home)
 	if len(si.skill.ObservedPaths) > 1 {
-		path = fmt.Sprintf("%d sources", len(si.skill.ObservedPaths))
+		path = fmt.Sprintf("(%d linked sources)", len(si.skill.ObservedPaths))
 	}
 	primary += "    " + path
+	if si.skill.DuplicateNameCount > 0 {
+		if si.skill.DuplicateContentDiffers {
+			primary += fmt.Sprintf("  ⚠ (diverges in %d other places)", si.skill.DuplicateNameCount)
+		} else {
+			primary += fmt.Sprintf("  (identical in %d other places)", si.skill.DuplicateNameCount)
+		}
+	}
 
 	// Source labels aren't shown here: for every built-in source they're
 	// identical to Agents (see internal/sources.Registry), so a parallel
