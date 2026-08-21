@@ -209,6 +209,35 @@ func TestSearch_CaseInsensitive(t *testing.T) {
 	}
 }
 
+func TestBuild_MarksProjectScopedSkills(t *testing.T) {
+	candidates := []discovery.Candidate{
+		{
+			Source:        sources.Source{Label: "Claude Code", Agents: []string{"Claude Code"}, Origin: sources.OriginProject},
+			ObservedPath:  "/repo/.claude/skills/a",
+			CanonicalPath: "/repo/.claude/skills/a",
+			SkillFilePath: "/repo/.claude/skills/a/SKILL.md",
+		},
+		candidate("Claude Code", []string{"Claude Code"}, "/home/.claude/skills/b", "/home/.claude/skills/b"),
+	}
+
+	got := Build(candidates, fakeParse(map[string]skill.Parsed{
+		"/repo/.claude/skills/a": {Name: "a"},
+		"/home/.claude/skills/b": {Name: "b"},
+	}))
+
+	byName := make(map[string]Skill, len(got.Skills))
+	for _, s := range got.Skills {
+		byName[s.Name] = s
+	}
+
+	if !byName["a"].ProjectScoped {
+		t.Errorf("expected project-origin candidate to produce ProjectScoped == true")
+	}
+	if byName["b"].ProjectScoped {
+		t.Errorf("expected built-in-origin candidate to produce ProjectScoped == false")
+	}
+}
+
 func TestBuild_PreservesVersion(t *testing.T) {
 	candidates := []discovery.Candidate{candidate("A", []string{"A"}, "/skills/a", "/a")}
 	parse := fakeParse(map[string]skill.Parsed{

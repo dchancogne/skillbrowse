@@ -2,6 +2,7 @@ package sources
 
 import (
 	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -55,6 +56,56 @@ func TestRegistry_ExcludesPluginCaches(t *testing.T) {
 	}
 }
 
+func TestProjectRoot_FindsNearestGitAncestor(t *testing.T) {
+	top := t.TempDir()
+	if err := os.Mkdir(filepath.Join(top, ".git"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	nested := filepath.Join(top, "a", "b", "c")
+	if err := os.MkdirAll(nested, 0o755); err != nil {
+		t.Fatal(err)
+	}
+
+	if got := projectRoot(nested); got != top {
+		t.Errorf("projectRoot(%q) = %q, want %q", nested, got, top)
+	}
+}
+
+func TestProjectRoot_FallsBackToCwdWhenNoGitFound(t *testing.T) {
+	dir := t.TempDir()
+	if got := projectRoot(dir); got != dir {
+		t.Errorf("projectRoot(%q) = %q, want %q (no .git found)", dir, got, dir)
+	}
+}
+
+func TestProjectRegistry_RootedUnderProjectDir(t *testing.T) {
+	project := t.TempDir()
+	if err := os.WriteFile(filepath.Join(project, ".git"), []byte("gitdir: /elsewhere\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	home := t.TempDir()
+
+	got := ProjectRegistry(project, home)
+	if len(got) != 5 {
+		t.Fatalf("expected 5 project sources, got %d", len(got))
+	}
+	for _, s := range got {
+		if !strings.HasPrefix(s.Root, project) {
+			t.Errorf("source %q root %q not under project %q", s.Label, s.Root, project)
+		}
+		if s.Origin != OriginProject {
+			t.Errorf("source %q origin = %q, want project", s.Label, s.Origin)
+		}
+	}
+}
+
+func TestProjectRegistry_NilWhenRootEqualsHome(t *testing.T) {
+	home := t.TempDir()
+	if got := ProjectRegistry(home, home); got != nil {
+		t.Errorf("expected nil when project root equals home, got %+v", got)
+	}
+}
+
 func TestLoad_NoDefaultsExcludesRegistry(t *testing.T) {
 	got, err := Load(&config.Config{}, nil, true)
 	if err != nil {
@@ -105,6 +156,13 @@ func TestLoad_CLIPathsBecomeCustomSources(t *testing.T) {
 }
 
 func TestLoad_CombinesAllThree(t *testing.T) {
+	// Pin HOME and cwd to the same directory (with no .git ancestor) so
+	// ProjectRegistry resolves to nil and doesn't add extra sources on top
+	// of the 5 built-ins this test is counting.
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	t.Chdir(home)
+
 	cfg := &config.Config{
 		Sources: []config.Source{
 			{Path: "/opt/a", Label: "A", Agents: []string{"Custom"}, MaxDepth: 4, Enabled: true},
@@ -116,5 +174,30 @@ func TestLoad_CombinesAllThree(t *testing.T) {
 	}
 	if len(got) != 5+1+1 {
 		t.Fatalf("expected 7 combined sources, got %d", len(got))
+	}
+}
+
+func TestLoad_IncludesProjectSourcesWhenRunFromInsideAProject(t *testing.T) {
+	t.Setenv("HOME", t.TempDir())
+
+	project := t.TempDir()
+	if err := os.WriteFile(filepath.Join(project, ".git"), []byte("gitdir: /elsewhere\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	t.Chdir(project)
+
+	got, err := Load(&config.Config{}, nil, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	projectCount := 0
+	for _, s := range got {
+		if s.Origin == OriginProject {
+			projectCount++
+		}
+	}
+	if projectCount != 5 {
+		t.Fatalf("expected 5 project-origin sources, got %d (of %d total)", projectCount, len(got))
 	}
 }

@@ -31,6 +31,7 @@ type Origin string
 
 const (
 	OriginBuiltin Origin = "built-in"
+	OriginProject Origin = "project"
 	OriginConfig  Origin = "config"
 	OriginCLI     Origin = "cli"
 )
@@ -55,21 +56,61 @@ func Registry() ([]Source, error) {
 	if err != nil {
 		return nil, fmt.Errorf("determine home directory: %w", err)
 	}
+	return registryFor(home, OriginBuiltin), nil
+}
 
-	root := func(parts ...string) string {
-		return filepath.Join(append([]string{home}, parts...)...)
+// registryFor builds the same set of per-agent skill-directory sources
+// Registry describes, rooted at root instead of the home directory. Shared
+// by Registry (root = home) and ProjectRegistry (root = a project
+// directory).
+func registryFor(root string, origin Origin) []Source {
+	j := func(parts ...string) string {
+		return filepath.Join(append([]string{root}, parts...)...)
 	}
 
 	return []Source{
-		{Label: "Agent Skills", Agents: []string{"Agent Skills"}, Root: root(".agents", "skills"), MaxDepth: directMaxDepth, Origin: OriginBuiltin},
-		{Label: "Claude Code", Agents: []string{"Claude Code"}, Root: root(".claude", "skills"), MaxDepth: directMaxDepth, Origin: OriginBuiltin},
-		{Label: "Cursor", Agents: []string{"Cursor"}, Root: root(".cursor", "skills"), MaxDepth: directMaxDepth, Origin: OriginBuiltin},
-		{Label: "Codex", Agents: []string{"Codex"}, Root: root(".codex", "skills"), MaxDepth: directMaxDepth, Origin: OriginBuiltin},
-		{Label: "Hermes", Agents: []string{"Hermes"}, Root: root(".hermes", "skills"), MaxDepth: directMaxDepth, Origin: OriginBuiltin},
-	}, nil
+		{Label: "Agent Skills", Agents: []string{"Agent Skills"}, Root: j(".agents", "skills"), MaxDepth: directMaxDepth, Origin: origin},
+		{Label: "Claude Code", Agents: []string{"Claude Code"}, Root: j(".claude", "skills"), MaxDepth: directMaxDepth, Origin: origin},
+		{Label: "Cursor", Agents: []string{"Cursor"}, Root: j(".cursor", "skills"), MaxDepth: directMaxDepth, Origin: origin},
+		{Label: "Codex", Agents: []string{"Codex"}, Root: j(".codex", "skills"), MaxDepth: directMaxDepth, Origin: origin},
+		{Label: "Hermes", Agents: []string{"Hermes"}, Root: j(".hermes", "skills"), MaxDepth: directMaxDepth, Origin: origin},
+	}
 }
 
-// Load combines the built-in registry (unless noDefaults is set), enabled
+// projectRoot walks up from cwd looking for a ".git" entry (a directory
+// for a normal checkout, or a file for a worktree/submodule), returning
+// the first ancestor that has one. If none is found before reaching the
+// filesystem root, cwd itself is returned unchanged.
+func projectRoot(cwd string) string {
+	dir := cwd
+	for {
+		if _, err := os.Lstat(filepath.Join(dir, ".git")); err == nil {
+			return dir
+		}
+		parent := filepath.Dir(dir)
+		if parent == dir {
+			return cwd
+		}
+		dir = parent
+	}
+}
+
+// ProjectRegistry returns the same per-agent skill-directory sources as
+// Registry, but rooted at the project containing cwd (see projectRoot)
+// instead of the home directory, so a repo's own committed skills are
+// discovered alongside the user's global ones. It returns nil when the
+// resolved project root is the home directory itself, to avoid scanning
+// the same directories twice under a different Origin.
+func ProjectRegistry(cwd, home string) []Source {
+	root := projectRoot(cwd)
+	if root == home {
+		return nil
+	}
+	return registryFor(root, OriginProject)
+}
+
+// Load combines the built-in registry (unless noDefaults is set), any
+// project-local sources for the current working directory, enabled
 // sources from cfg, and unlabeled command-line --path sources into the
 // final list of sources to scan.
 func Load(cfg *config.Config, cliPaths []string, noDefaults bool) ([]Source, error) {
@@ -81,6 +122,15 @@ func Load(cfg *config.Config, cliPaths []string, noDefaults bool) ([]Source, err
 			return nil, err
 		}
 		result = append(result, builtins...)
+
+		// Project-source detection is best-effort: unlike Registry's home
+		// directory (a fatal environment error per design doc §9), failing
+		// to resolve cwd here just means no project sources are added.
+		if cwd, err := os.Getwd(); err == nil {
+			if home, err := os.UserHomeDir(); err == nil {
+				result = append(result, ProjectRegistry(cwd, home)...)
+			}
+		}
 	}
 
 	if cfg != nil {
