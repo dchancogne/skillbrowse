@@ -1,10 +1,14 @@
 package ui
 
 import (
+	"bytes"
 	"strings"
 	"testing"
 
+	"charm.land/bubbles/v2/list"
 	"charm.land/lipgloss/v2"
+
+	"github.com/dchancogne/skillbrowse/internal/catalog"
 )
 
 func TestWrapText_FitsOnOneLine(t *testing.T) {
@@ -51,5 +55,30 @@ func TestWrapText_PaddingKeepsFixedLineCount(t *testing.T) {
 	got := wrapText("", 40, maxDescLines)
 	if len(got) != 0 {
 		t.Errorf("empty description: got %q, want no lines", got)
+	}
+}
+
+func renderSkillItem(t *testing.T, s catalog.Skill) string {
+	t.Helper()
+	d := newSkillDelegate()
+	items := itemsFromSkills([]catalog.Skill{s}, "")
+	m := list.New(items, d, 80, 10)
+
+	var buf bytes.Buffer
+	d.Render(&buf, m, 0, items[0])
+	return buf.String()
+}
+
+func TestRender_TagsProjectScopedSkills(t *testing.T) {
+	got := renderSkillItem(t, catalog.Skill{Name: "demo", ProjectScoped: true})
+	if !strings.Contains(got, "[project]") {
+		t.Errorf("expected project-scoped skill's row to contain a [project] tag, got %q", got)
+	}
+}
+
+func TestRender_OmitsProjectTagForGlobalSkills(t *testing.T) {
+	got := renderSkillItem(t, catalog.Skill{Name: "demo", ProjectScoped: false})
+	if strings.Contains(got, "[project]") {
+		t.Errorf("expected global skill's row to omit the [project] tag, got %q", got)
 	}
 }

@@ -491,6 +491,11 @@ func (m *Model) renderHeader(s catalog.Skill) string {
 	fmt.Fprintf(&b, "%s %s\n\n", m.style("Description:", sectionStyle), m.style(s.Description, headerDescStyle))
 
 	fmt.Fprintf(&b, "%s %s\n", m.style("Agents:", sectionStyle), strings.Join(s.Agents, ", "))
+	scope := "Global"
+	if s.ProjectScoped {
+		scope = "Project (this repo)"
+	}
+	fmt.Fprintf(&b, "%s %s\n", m.style("Scope:", sectionStyle), scope)
 	if len(s.ObservedPaths) > 0 {
 		// "Sources:" now heads the actual discovered filesystem locations
 		// rather than duplicating Agents with a parallel list of source

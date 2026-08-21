@@ -14,6 +14,7 @@ import (
 
 	"github.com/dchancogne/skillbrowse/internal/discovery"
 	"github.com/dchancogne/skillbrowse/internal/skill"
+	"github.com/dchancogne/skillbrowse/internal/sources"
 )
 
 // Skill is one normalized, deduplicated catalog record.
@@ -32,6 +33,12 @@ type Skill struct {
 	Body          string // Content with front matter stripped, for Markdown rendering
 	ContentHash   string
 	Diagnostics   []string
+
+	// ProjectScoped is true when this skill was found under a project-local
+	// source (sources.OriginProject) - i.e. a skill folder committed to the
+	// current repo, rather than (or in addition to) the user's home
+	// directory.
+	ProjectScoped bool
 
 	// DuplicateNameCount is how many other records (at different canonical
 	// paths) share this Skill's Name, case-insensitively. It is 0 unless a
@@ -71,10 +78,14 @@ func Build(candidates []discovery.Candidate, parse ParseFunc) Catalog {
 		parsed := parse(first.CanonicalPath, first.SkillFilePath)
 
 		var observed, agents, labels []string
+		projectScoped := false
 		for _, c := range group {
 			observed = append(observed, c.ObservedPath)
 			agents = append(agents, c.Source.Agents...)
 			labels = append(labels, c.Source.Label)
+			if c.Source.Origin == sources.OriginProject {
+				projectScoped = true
+			}
 		}
 
 		skills = append(skills, Skill{
@@ -92,6 +103,7 @@ func Build(candidates []discovery.Candidate, parse ParseFunc) Catalog {
 			Body:          parsed.Body,
 			ContentHash:   parsed.ContentHash,
 			Diagnostics:   parsed.Diagnostics,
+			ProjectScoped: projectScoped,
 		})
 	}
 

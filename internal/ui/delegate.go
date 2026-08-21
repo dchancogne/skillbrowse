@@ -75,6 +75,9 @@ func (d skillDelegate) Render(w io.Writer, m list.Model, index int, item list.It
 	textWidth := m.Width() - d.styles.normalPrimary.GetPaddingLeft() - d.styles.normalPrimary.GetPaddingRight()
 
 	primary := si.skill.Name
+	if si.skill.ProjectScoped {
+		primary += "  [project]"
+	}
 	if si.skill.Version != "" {
 		primary += "  v" + si.skill.Version
 	}
